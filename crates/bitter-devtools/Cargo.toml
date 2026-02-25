@@ -1,0 +1,10 @@
+[package]
+name = "bitter-devtools"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+tracing.workspace = true

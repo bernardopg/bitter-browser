@@ -1,0 +1,19 @@
+[package]
+name = "bitter-ui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+gtk4.workspace = true
+libadwaita.workspace = true
+webkit6.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+bitter-core = { path = "../bitter-core" }
+bitter-net = { path = "../bitter-net" }
+bitter-adblock = { path = "../bitter-adblock" }
+bitter-devtools = { path = "../bitter-devtools" }
+uuid = { version = "1.8", features = ["v4"] }

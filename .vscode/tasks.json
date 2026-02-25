@@ -1,0 +1,20 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "cargo check",
+			"type": "shell",
+			"command": "cargo check"
+		},
+		{
+			"label": "cargo check",
+			"type": "shell",
+			"command": "cargo check"
+		},
+		{
+			"label": "git commit",
+			"type": "shell",
+			"command": "git add . && git commit -m \"feat: implement phase 1 foundation\" && git push"
+		}
+	]
+}

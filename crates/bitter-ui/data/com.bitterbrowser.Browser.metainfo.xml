@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.bitterbrowser.Browser</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MPL-2.0</project_license>
+  <name>Bitter Browser</name>
+  <summary>The browser that bites back — fast, sharp, and precise.</summary>
+  <description>
+    <p>
+      Bitter Browser is a next-generation, developer-first web browser for Arch Linux that combines
+      the best qualities of Arc, Chrome, Firefox, Vivaldi, and Zen Browser into a single, cohesive,
+      highly efficient, and visually stunning product.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.bitterbrowser.Browser.desktop</launchable>
+  <url type="homepage">https://github.com/bernardopg/bitter-browser</url>
+  <url type="bugtracker">https://github.com/bernardopg/bitter-browser/issues</url>
+  <developer_name>Bitter Browser Contributors</developer_name>
+</component>
