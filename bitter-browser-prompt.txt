@@ -1,0 +1,1071 @@
+================================================================================
+  BITTER BROWSER — MASTER SPECIFICATION PROMPT
+  A PhD-Level Engineering & Design Brief
+  Target Platform: Arch Linux (Wayland-native)
+  Version: 1.0
+================================================================================
+
+You are a PhD-level software engineer and UX/UI designer with deep expertise in
+systems programming, browser internals, rendering engines, and human-computer
+interaction. Your task is to design and implement "Bitter Browser" — a
+next-generation, developer-first web browser for Arch Linux that combines the
+best qualities of Arc, Chrome, Firefox, Vivaldi, and Zen Browser into a single,
+cohesive, highly efficient, and visually stunning product.
+
+Read this specification in its entirety before writing a single line of code.
+Every decision must be deliberate, principled, and justified by measurable
+outcomes in performance, usability, or developer experience.
+
+================================================================================
+  SECTION 1 — PROJECT IDENTITY & PHILOSOPHY
+================================================================================
+
+PROJECT NAME: Bitter Browser
+TAGLINE: "The browser that bites back — fast, sharp, and precise."
+PRIMARY USER: Power users, web developers, and engineers on Arch Linux
+SECONDARY USER: Designers who test across breakpoints and debug CSS daily
+
+CORE PRINCIPLES (non-negotiable):
+
+  1. EFFICIENCY FIRST
+     Every interaction must feel instant. Perceived latency is a bug. Cold start
+     under 500ms. Tab switch under 16ms. Omnibar response under 50ms.
+
+  2. DEVELOPER-NATIVE
+     DevTools are not an afterthought — they are a first-class citizen of the UI,
+     designed to rival and exceed Chrome DevTools in depth and exceed Firefox
+     DevTools in accessibility and ergonomics.
+
+  3. CLEAN DESIGN, ZERO CLUTTER
+     The browser chrome (UI) must be invisible when you don't need it and
+     instantly accessible when you do. Inspired by the spatial design philosophy
+     of Linear, Arc, and Raycast. Every pixel must earn its place.
+
+  4. RESPECT THE PLATFORM
+     Bitter Browser is a Linux-first, Wayland-native application. It must follow
+     XDG specifications, integrate with system keyring, portals, notifications,
+     and feel indistinguishable from a native GTK4/Adwaita application.
+
+  5. PRIVACY BY DEFAULT
+     No telemetry. No phone-home. Ad blocking and tracker blocking are not
+     optional features — they are compiled into the engine itself.
+
+  6. ZERO LEGACY DEBT
+     Build for 2025 and beyond. Do not carry compatibility cruft. Target modern
+     web standards (Baseline 2024+), modern Linux APIs (Wayland, pipewire,
+     libsecret), and modern Rust (2024 edition).
+
+================================================================================
+  SECTION 2 — TECHNOLOGY STACK (EXHAUSTIVE)
+================================================================================
+
+--- 2.1 RENDERING ENGINE ---
+
+PRIMARY CHOICE: WebKitGTK4 (webkit2gtk-4.1)
+  - Maintained, production-ready, GTK4-native
+  - Supports modern web standards: CSS Grid, Subgrid, Container Queries,
+    View Transitions, Web Animations API, WebGPU (experimental)
+  - WebKit Inspector protocol for DevTools integration
+  - WebExtensions API via WPE WebExtensions bridge
+
+ALTERNATIVE (future roadmap): Servo (Mozilla, Rust-native)
+  - When Servo reaches production maturity, evaluate for replacement
+  - Servo's parallel layout engine would eliminate main-thread jank
+
+JAVASCRIPT ENGINE: JavaScriptCore (bundled with WebKitGTK)
+  - JIT-compiled, competitive with V8 for most workloads
+  - If performance gaps emerge, evaluate embedding V8 via WebKitGTK's
+    experimental V8 backend
+
+--- 2.2 APPLICATION LANGUAGE ---
+
+PRIMARY: Rust (2024 edition)
+  - All browser chrome, tab management, IPC, session management, and
+    extension runtime written in Rust
+  - Memory safety by default eliminates entire classes of security bugs
+  - Fearless concurrency for parallel tab rendering coordination
+
+UI BINDINGS: gtk4-rs (gtk4 + libadwaita crates)
+  - Type-safe GTK4 bindings for Rust
+  - Adwaita widgets for platform-native look and feel
+  - gtk4::CssProvider for custom theming on top of Adwaita
+
+ASYNC RUNTIME: Tokio
+  - All network I/O, DNS resolution, cache reads, and extension messaging
+    run on Tokio's multi-threaded runtime
+  - Zero blocking operations on the main GTK thread
+
+BUILD SYSTEM: Cargo + Meson
+  - Cargo manages Rust dependencies and compilation
+  - Meson wraps Cargo for system integration, GResources, schema compilation,
+    desktop file installation, and man page generation
+  - CI: GitHub Actions with cross-compilation targets
+
+--- 2.3 PROCESS ARCHITECTURE ---
+
+Bitter Browser uses a strict multi-process model:
+
+  BROWSER PROCESS (Main)
+  ├── UI Thread (GTK4 main loop)
+  ├── Session Manager
+  ├── Extension Runtime (sandboxed)
+  └── IPC Hub (DBus + Unix sockets)
+
+  RENDERER PROCESSES (1 per tab origin)
+  ├── WebKitGTK WebView (isolated)
+  ├── JavaScript Context
+  └── Content Security sandbox (seccomp-bpf)
+
+  NETWORK PROCESS (singleton)
+  ├── HTTP/2 + HTTP/3 (QUIC) via WebKit network stack
+  ├── DNS-over-HTTPS resolver (Hickory DNS / trust-dns)
+  ├── Certificate store (rustls + system trust store)
+  └── Cache (LRU disk cache, configurable size)
+
+  GPU PROCESS (singleton)
+  ├── Vulkan compositor (via wgpu or WebKit GPU process)
+  ├── WebGL/WebGPU contexts
+  └── CSS compositing layers
+
+  DEVTOOLS PROCESS (on-demand)
+  ├── WebKit Inspector Server (CDP-compatible protocol)
+  ├── Performance sampler (perf_event_open)
+  └── Memory profiler (jemalloc stats + /proc/smaps)
+
+IPC MECHANISM:
+  - Between processes: Unix domain sockets + length-prefixed protobuf messages
+  - System integration: DBus (org.bitterbrowser.Browser)
+  - Wayland protocols: xdg-shell, xdg-decoration, wp-fractional-scale,
+    ext-idle-notify, xdg-activation
+
+--- 2.4 DATA STORAGE ---
+
+HISTORY & BOOKMARKS: SQLite (via rusqlite)
+  - WAL journal mode for concurrent reads
+  - FTS5 full-text search on page titles and URLs
+  - frecency algorithm (like Firefox Places) for omnibar ranking
+
+PASSWORDS & SECRETS: libsecret (via secret-service DBus portal)
+  - Integrates with kwallet, gnome-keyring, KDE Wallet
+  - Never stored in plaintext
+
+COOKIES & SESSION: SQLite (WebKit managed, with Bitter overlay)
+SETTINGS: TOML via config-rs (stored at $XDG_CONFIG_HOME/bitter-browser/)
+EXTENSIONS: $XDG_DATA_HOME/bitter-browser/extensions/ (WebExtensions format)
+CACHE: $XDG_CACHE_HOME/bitter-browser/ (HTTP cache, thumbnails, icons)
+
+--- 2.5 NETWORKING ---
+
+- HTTP/1.1, HTTP/2, HTTP/3 (QUIC) via WebKit's network stack
+- DNS-over-HTTPS: Cloudflare (1.1.1.1), NextDNS, custom resolver
+  configurable via Settings > Privacy > DNS
+- HSTS preload list (maintained in-process, updated weekly)
+- Certificate Transparency enforcement
+- OCSP stapling
+- Proxy: system proxy auto-detection (GNOME/KDE settings via DBus),
+  manual SOCKS5/HTTP proxy, PAC file support
+- WebRTC IP leak protection (route through proxy if configured)
+
+--- 2.6 PRIVACY & SECURITY ENGINE ---
+
+INTEGRATED AD BLOCKER (native, not an extension):
+  - Engine: Adblock-Rust (same engine as Brave)
+  - Filter lists: EasyList, EasyPrivacy, Peter Lowe's, uBlock Origin extras
+  - Update frequency: every 24h, cryptographically signed updates
+  - CNAME uncloaking for tracker evasion detection
+  - Cosmetic filtering (element hiding)
+  - Scriptlet injection for cookie consent bypass
+
+FINGERPRINT PROTECTION:
+  - Canvas noise injection (imperceptible, randomized per session)
+  - AudioContext fingerprint protection
+  - Font enumeration limiting
+  - WebGL renderer string spoofing
+  - Timezone normalization (UTC in JS unless user overrides)
+  - Screen resolution reporting normalization
+
+COOKIE POLICY:
+  - First-party isolation by default (Total Cookie Protection, Firefox-style)
+  - Third-party cookies blocked by default
+  - SameSite=Strict on all cookies set by extension
+
+HTTPS:
+  - HTTPS-only mode by default
+  - Automatic HTTPS upgrade (HSTS + preload)
+  - Certificate error pages are informative and non-bypassable for EV certs
+
+SANDBOX:
+  - Renderer processes: seccomp-bpf syscall filter + Linux namespaces
+  - Extension processes: additional capability restrictions
+  - No JIT in sandboxed workers (opt-in JIT exception for trusted origins)
+
+================================================================================
+  SECTION 3 — UI/UX DESIGN SPECIFICATION
+================================================================================
+
+--- 3.1 DESIGN LANGUAGE ---
+
+PHILOSOPHY: "Calm Technology" meets "Developer Precision"
+  - The browser UI should feel like a high-end code editor: everything has a
+    purpose, nothing is decorative, and the typography is perfect.
+  - Inspired by: Linear (precision), Arc (spatial tabs), Raycast (command UX),
+    VS Code (developer familiarity)
+
+COLOR SYSTEM:
+  Dark Mode (default):
+    Background:      #0d0d0d  (near-black, not pure black)
+    Surface:         #141414  (cards, sidebars)
+    Surface elevated:#1a1a1a  (modals, popovers)
+    Border:          #2a2a2a  (subtle separators)
+    Text primary:    #f0f0f0
+    Text secondary:  #888888
+    Accent (default):#ff4d00  (bitter orange — the brand color)
+    Accent hover:    #ff6a2b
+    Error:           #ff4444
+    Success:         #22c55e
+    Warning:         #f59e0b
+
+  Light Mode:
+    Background:      #fafafa
+    Surface:         #ffffff
+    Surface elevated:#f5f5f5
+    Border:          #e5e5e5
+    Text primary:    #111111
+    Text secondary:  #666666
+    Accent:          #ff4d00
+    (same functional colors as dark, adjusted for contrast)
+
+  ACCENT COLOR: User-configurable from 8 presets + custom hex input
+    Presets: Bitter Orange (#ff4d00), Electric Blue (#3b82f6),
+             Emerald (#10b981), Purple (#8b5cf6), Rose (#f43f5e),
+             Amber (#f59e0b), Cyan (#06b6d4), Mono (#888888)
+
+TYPOGRAPHY:
+  UI Font:        "Geist" (Vercel) — clean, geometric, 4 weights
+  Monospace Font: "Geist Mono" — for DevTools, address bar, code
+  Fallback stack: "Inter", "Adwaita Sans", system-ui, sans-serif
+  Base size:      13px (compact) / 14px (comfortable) — user-selectable
+  Line height:    1.5 for body, 1.2 for UI elements
+
+ICONOGRAPHY:
+  Library: Phosphor Icons (Duotone variant for active states)
+  Size: 16px (toolbar), 14px (sidebar), 12px (status bar)
+  Color: inherits from text-secondary, accent on hover/active
+  Rendering: SVG, loaded as GResources for zero-latency access
+
+SPACING & GRID:
+  Base unit: 4px
+  Spacing scale: 4, 8, 12, 16, 20, 24, 32, 40, 48px
+  Border radius: 4px (inputs), 6px (cards), 8px (modals), 12px (panels)
+  All measurements in logical pixels (HiDPI-safe via GTK scaling)
+
+MOTION & ANIMATION:
+  Framework: Adwaita animations + custom spring physics (via libadwaita)
+  Duration: 120ms (micro), 200ms (standard), 300ms (entrance/exit)
+  Easing: spring(stiffness=300, damping=30) — natural, not linear
+  Reduce motion: fully respects prefers-reduced-motion via GTK settings
+  60fps target: all animations on GPU compositor layer, never blocking main
+
+--- 3.2 WINDOW LAYOUT ---
+
+┌─────────────────────────────────────────────────────────┐
+│ [SIDEBAR]        [TOOLBAR]              [ACTIONS]        │
+│                                                          │
+│  ┌──────┐  ┌──────────────────────────────────────┐     │
+│  │ TABS │  │           ADDRESS BAR                │ ··· │
+│  │      │  └──────────────────────────────────────┘     │
+│  │  1   │                                                │
+│  │  2   │  ┌──────────────────────────────────────────┐ │
+│  │  3   │  │                                          │ │
+│  │  ·   │  │          WEB CONTENT                     │ │
+│  │  ·   │  │                                          │ │
+│  │      │  │                                          │ │
+│  │ [+]  │  │                                          │ │
+│  └──────┘  └──────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+
+SIDEBAR (left, collapsible, 220px default, 56px icon-only mode):
+  - Vertical tab list (Arc/Zen inspired)
+  - Tab groups with color labels (drag-to-group)
+  - Tab search (Ctrl+Shift+F searches open tabs)
+  - Pinned tabs at top (always visible, icon-only)
+  - Recent/suspended tabs section (collapsed by default)
+  - Bottom: New Tab button, Settings icon, Profile icon
+  - Sidebar can be on LEFT or RIGHT (user preference)
+  - Auto-hide mode: sidebar overlays content on hover (Ctrl+\ to toggle)
+
+TOOLBAR (horizontal, top):
+  - Back/Forward buttons (long-press for history dropdown)
+  - Reload (Ctrl+R) / Stop (Escape) — same button
+  - ADDRESS BAR (see 3.3)
+  - Security indicator (lock icon, clickable for cert info)
+  - Reader mode toggle (auto-detects readability)
+  - Bookmark toggle (star)
+  - Extension action buttons (configurable)
+  - DevTools toggle (F12)
+  - Menu (···)
+
+TOOLBAR can be HIDDEN in fullscreen (F11), with top-edge auto-reveal.
+
+STATUS BAR (bottom, ephemeral):
+  - Shows hovered link URL
+  - Shows loading progress
+  - Disappears when idle (500ms timeout)
+  - Never takes permanent space in layout
+
+--- 3.3 ADDRESS BAR (OMNIBAR) ---
+
+The omnibar is the most important UI element. It must be exceptional.
+
+BEHAVIOR:
+  - Ctrl+L: focus omnibar, select all
+  - Typing immediately shows results (< 50ms latency)
+  - Escape: clear and defocus
+  - Enter: navigate or execute command
+
+RESULT TYPES (ordered by frecency):
+  1. Exact URL match (green icon)
+  2. History matches (frecency-ranked, FTS5 search)
+  3. Bookmarks (blue icon, searchable by title/tag)
+  4. Open tabs (instant switch, purple icon)
+  5. Search suggestions (async, configurable engine)
+  6. Commands (prefixed with ">", e.g. ">clear cache")
+  7. Calculator (type "1+1" → shows "= 2" inline)
+  8. Unit conversion ("100px to rem")
+
+DISPLAY:
+  - Dropdown: max 8 results, scrollable
+  - Each result: favicon (16px) | title | URL (dimmed) | keyboard shortcut
+  - Keyboard navigation: ↑↓ arrows, Tab to cycle types
+  - Mouse: hover highlights, click navigates
+
+SEARCH ENGINES:
+  - Default: DuckDuckGo (privacy-first)
+  - Configurable: Google, Bing, Brave Search, Kagi, custom
+  - Bangs: "!g query" opens Google, "!w query" opens Wikipedia (DDG-style)
+  - Per-engine keyword shortcuts (e.g., "g query", "mdn Array.map")
+
+COMMAND PALETTE (Ctrl+K):
+  - Global command palette (Raycast-style)
+  - Searches: tabs, bookmarks, history, settings, commands, extensions
+  - Commands: "New Tab", "Open Downloads", "Toggle Dark Mode",
+    "Clear Cache", "Copy URL", "Mute Tab", "Pin Tab", etc.
+  - Keyboard shortcut displayed next to each command
+  - Recently used commands shown first
+
+--- 3.4 TAB SYSTEM ---
+
+VERTICAL TABS (sidebar):
+  - Each tab: favicon (16px) | title (truncated) | close button (on hover)
+  - Tab height: 36px (comfortable touch target)
+  - Active tab: accent-colored left border, slightly elevated surface
+  - Loading tab: animated spinner replacing favicon
+  - Audible tab: speaker icon (click to mute)
+  - Crashed tab: skull icon with reload button
+
+TAB GROUPS:
+  - Drag tabs onto each other to create a group
+  - Groups have a color label + optional name
+  - Collapsed groups show favicon stack
+  - Groups persist across sessions
+
+TAB PREVIEWS:
+  - Hover over tab for 400ms: live thumbnail preview (200x150px)
+  - Preview shows page title + URL
+  - Preview position: right of sidebar (never obscures content)
+
+TAB STACKING (Vivaldi-inspired):
+  - Ctrl+Click tabs to multi-select
+  - Stack selected tabs into visual tile layout
+  - Stacked tabs split the webview area (2-col, 2x2, custom)
+
+SUSPENDED TABS:
+  - Tabs inactive for >30min are suspended (configurable)
+  - Suspended tabs retain favicon + title, use ~2MB RAM vs ~100MB
+  - Click to reload and restore scroll position
+  - Never suspend: pinned tabs, tabs with active forms, tabs playing media
+
+TAB BAR KEYBOARD SHORTCUTS:
+  Ctrl+T          New tab
+  Ctrl+W          Close tab
+  Ctrl+Shift+T    Reopen last closed tab (up to 10 levels)
+  Ctrl+Tab        Next tab (MRU order by default)
+  Ctrl+1..9       Switch to tab by position
+  Ctrl+Shift+]    Next tab (sequential)
+  Ctrl+Shift+[    Previous tab (sequential)
+  Ctrl+M          Mute/unmute tab
+  Ctrl+D          Bookmark tab
+
+--- 3.5 WORKSPACES (ARC-INSPIRED) ---
+
+Workspaces are named collections of tab groups:
+  - Example: "Work", "Research", "Personal", "Shopping"
+  - Switch with Ctrl+1..5 (mapped to workspace, not tab position when sidebar open)
+  - Each workspace has its own tab stack, persisted to disk
+  - Workspaces visible at bottom of sidebar (icons only)
+  - Quick switcher: Ctrl+` cycles workspaces
+  - New tab inherits current workspace
+
+--- 3.6 SETTINGS UI ---
+
+Settings open as a modal overlay panel (not a new tab):
+  - Sidebar navigation: General, Appearance, Privacy, Search, Extensions,
+    Shortcuts, DevTools, About
+  - Search bar at top (search all settings by keyword)
+  - Changes apply immediately (no "Save" button for most settings)
+  - Export/import settings as TOML
+
+================================================================================
+  SECTION 4 — DEVTOOLS (THE CROWN JEWEL)
+================================================================================
+
+DevTools is the primary differentiator of Bitter Browser. It must be
+best-in-class for web developers.
+
+--- 4.1 ARCHITECTURE ---
+
+DevTools opens as:
+  a) DOCKED: bottom panel (default, F12), left panel, right panel
+  b) UNDOCKED: separate GTK window (drag out of dock or Ctrl+Shift+D)
+  c) POPOUT: individual panels as separate windows
+
+DevTools communicates with the page via WebKit Inspector Protocol (WIP),
+a CDP-compatible protocol. This means Chrome DevTools extensions and
+external tools (e.g., Playwright, Puppeteer) can connect via CDP bridge.
+
+--- 4.2 PANEL: ELEMENTS INSPECTOR ---
+
+Left pane: DOM tree
+  - Syntax-highlighted HTML with indentation
+  - Collapsed by default, expand on click
+  - Element badges: event listeners, custom elements, grid, flex containers
+  - Search: Ctrl+F searches DOM by selector, text, or XPath
+  - Edit: double-click attribute/text to edit live
+  - Drag nodes to reorder in DOM
+  - Right-click context menu:
+    - Copy selector (shortest unique CSS selector)
+    - Copy XPath
+    - Copy as HTML
+    - Store as global variable ($0, $1 in console)
+    - Scroll into view
+    - Force state: :hover, :focus, :active, :focus-within
+
+Right pane: CSS Styles
+  - Computed styles (searchable)
+  - Cascaded styles with source file:line links
+  - Box model diagram (interactive, click to edit margin/padding/border)
+  - Font tab: shows rendered font, fallback chain, font metrics
+  - Grid overlay: toggle grid visualization (like Chrome's grid inspector)
+  - Flexbox overlay: toggle flex container visualization
+  - Accessibility tab: ARIA role, computed name, contrast ratio
+  - Event listeners: list all attached event listeners with source links
+  - CSS Variables panel: list all --custom-properties in scope
+
+SPECIFICITY VISUALIZER:
+  - Hover over any CSS rule to see specificity score (A,B,C notation)
+  - Side-by-side comparison of competing rules
+
+COLOR PICKER (integrated):
+  - Click any color value in CSS panel: opens eyedropper + color wheel
+  - Supports HEX, RGB, HSL, oklch, color-mix()
+  - Shows contrast ratio vs background (WCAG 2.1 AA/AAA badges)
+
+--- 4.3 PANEL: CONSOLE ---
+
+  - Multi-line input with Shift+Enter for newlines
+  - Full syntax highlighting + autocompletion (Monaco-style)
+  - Console snippets: save reusable JS snippets (Ctrl+Shift+P to run)
+  - $0: last inspected element
+  - $$("selector"): querySelectorAll shorthand
+  - copy(): copies value to clipboard
+  - monitor(fn): logs calls to function fn
+  - monitorEvents(el, "click"): logs events
+  - Filter by type: log, warn, error, info, verbose, network, custom levels
+  - Preserve log across navigation (toggleable)
+  - Link to source in every stack trace (clickable, opens Sources panel)
+  - Timestamps (optional, configurable)
+  - Group collapsing for console.group()
+
+--- 4.4 PANEL: NETWORK ---
+
+REQUEST LIST:
+  - Columns: Status | Method | Type | Initiator | Size | Time | Waterfall
+  - Color-coded by type (document, stylesheet, script, image, xhr, fetch, ws)
+  - Filter bar: by type, by status code, by domain, text search on URL
+  - Preserve log toggle (survives navigation)
+  - Record network toggle (pause/resume)
+
+WATERFALL:
+  - Per-request timing: DNS | Connect | TLS | TTFB | Download
+  - Critical path highlighting (resources blocking first paint)
+  - Group by domain or initiator chain
+
+REQUEST DETAIL (click any request):
+  - Headers tab: request + response headers, formatted and searchable
+  - Preview tab: rendered response (JSON tree, image, HTML, binary hex)
+  - Response tab: raw response body with syntax highlighting
+  - Timing tab: detailed waterfall for that single request
+  - Cookies tab: cookies sent + received
+  - Initiator tab: JS call stack that triggered the request
+  - Copy as: cURL, fetch(), PowerShell WebRequest, HTTPie
+
+THROTTLING:
+  - Built-in presets: Online, Fast 4G, Slow 4G, 3G, Offline, custom
+  - Custom: download kbps, upload kbps, latency ms
+  - Per-request blocking: right-click > "Block request URL" or "Block domain"
+
+SEARCH (Ctrl+F in Network panel):
+  - Search across all response bodies (text or regex)
+
+--- 4.5 PANEL: SOURCES ---
+
+FILE TREE:
+  - Grouped by origin (domain) and type
+  - Shows source-mapped files (TypeScript, JSX, SCSS → originals)
+  - Link local workspace folder to remap sources to disk files
+    (edit live, see changes without re-uploading)
+
+DEBUGGER:
+  - Full JavaScript debugger via WebKit Inspector
+  - Breakpoints: line, conditional, logpoint, DOM mutation, XHR/fetch
+  - Call stack, scope chain, watch expressions
+  - Async stack traces (reconstructed across await boundaries)
+  - Blackbox scripts (node_modules, frameworks) to skip in step-through
+  - Step: into, over, out, continue
+  - Pause on caught/uncaught exceptions toggle
+  - Pretty-print minified code (Ctrl+Shift+P)
+
+--- 4.6 PANEL: PERFORMANCE ---
+
+RECORDING:
+  - Record button: captures frame timeline, JS events, layout, paint, composite
+  - Start profiling on page load checkbox
+  - Memory sampling during recording toggle
+
+FLAME GRAPH:
+  - Zoomable timeline (scroll to zoom, drag to pan)
+  - Color-coded tracks: Scripting (yellow), Rendering (purple),
+    Painting (green), Loading (blue), Idle (white)
+  - Bottom-up + top-down views
+  - Call tree with self time vs total time
+  - Long task markers (>50ms highlighted in red)
+  - Web Vitals markers: LCP, CLS, FID/INP overlay on timeline
+
+FRAME ANALYSIS:
+  - Per-frame breakdown: JS | Style | Layout | Paint | Composite
+  - Jank detector: frames > 16.6ms flagged
+  - Layout shift entries (CLS debug)
+
+--- 4.7 PANEL: MEMORY ---
+
+SNAPSHOT TYPES:
+  - Heap snapshot: full JS heap graph (nodes, edges, retained size)
+  - Allocation instrumentation: track allocations over time
+  - Allocation sampling: statistical profiling (low overhead)
+
+HEAP EXPLORER:
+  - Summary, Containment, Statistics, Comparison (diff two snapshots) views
+  - Retained size heuristics highlighted
+  - Filter by constructor, distance from GC root
+  - Detect detached DOM nodes (memory leaks from removed elements)
+
+--- 4.8 PANEL: APPLICATION ---
+
+  - Service Workers: list, lifecycle state, update, unregister
+  - Cache Storage: list caches, view entries, delete
+  - IndexedDB: browse databases, object stores, records, execute queries
+  - Cookies: list, filter, edit, delete (per domain)
+  - localStorage / sessionStorage: key-value editor
+  - Manifest: PWA manifest parsed and validated
+  - Web Push: subscription status, send test push
+
+--- 4.9 PANEL: SECURITY ---
+
+  - Certificate chain viewer (full DER dump option)
+  - TLS version + cipher suite
+  - Mixed content warnings list
+  - CORS errors with resolution suggestions
+  - CSP violations log
+  - Permissions policy effective values
+
+--- 4.10 PANEL: LIGHTHOUSE / AUDIT ---
+
+  - Integrated Lighthouse 12 (WebAssembly build)
+  - Categories: Performance, Accessibility, Best Practices, SEO, PWA
+  - Throttling: simulated or devtools-applied
+  - Reports saved to $XDG_DOCUMENTS_DIR/bitter-browser/audits/ as JSON + HTML
+  - Diff reports: compare two runs side-by-side
+
+--- 4.11 RESPONSIVE DESIGN MODE ---
+
+  - Toggle: Ctrl+Shift+M
+  - Device presets: iPhone 15, Pixel 8, iPad Pro, Galaxy S24, custom
+  - Custom dimensions: type exact pixel values
+  - DPR (device pixel ratio): 1x, 2x, 3x
+  - Orientation: portrait / landscape
+  - Touch simulation: emulate touch events
+  - Media query inspector: visualize all breakpoints as a ruler
+  - Network throttle integrated (simulate mobile network)
+  - Screenshot capture at current viewport size
+
+--- 4.12 ADDITIONAL DEVELOPER FEATURES ---
+
+JSON VIEWER:
+  - Auto-detected for application/json responses
+  - Collapsible tree, copy node, search with JSONPath
+  - Raw view toggle
+  - URL detection: values that are URLs become clickable links
+
+CSS COVERAGE:
+  - Record which CSS rules were applied during page interaction
+  - Shows percentage of each stylesheet actually used
+  - Export unused CSS list
+
+JS COVERAGE:
+  - Block-level coverage (which lines/branches were executed)
+  - Export as LCOV for integration with coverage tools
+
+CHANGES PANEL:
+  - Shows all live CSS/HTML edits made in DevTools this session
+  - Copy as diff or copy modified source
+  - Revert individual changes
+
+SCREENSHOT & CAPTURE:
+  - Ctrl+Shift+S: full page screenshot (PNG, stitched if taller than viewport)
+  - Element screenshot: right-click element → "Capture screenshot"
+  - Format: PNG or WebP (configurable)
+  - Saves to $XDG_PICTURES_DIR/bitter-browser/ or clipboard (toggle)
+
+================================================================================
+  SECTION 5 — PERFORMANCE SPECIFICATIONS
+================================================================================
+
+All targets measured on mid-range hardware (AMD Ryzen 5, 16GB RAM, NVMe SSD):
+
+  Cold start to first tab interactive:      < 500ms
+  Warm start (already in memory):           < 150ms
+  Tab creation to paint:                    < 200ms
+  Tab switch (suspended → active):          < 100ms (restore) / < 16ms (cached)
+  Omnibar keystroke to results:             < 50ms
+  DevTools open (F12):                      < 300ms
+  Memory per idle background tab:           < 15MB (suspended) / < 80MB (alive)
+  Memory per active complex SPA:            < 200MB
+  CPU at idle (10 background tabs):         < 0.5% CPU (single core)
+  Scroll frame rate:                        60fps / 120fps on HFR displays
+
+OPTIMIZATION STRATEGIES:
+  - Preload DNS for links in viewport (link rel=dns-prefetch equivalent)
+  - Speculative prerender for links that are likely to be clicked (confidence >80%)
+  - Brotli decompression on network process (parallel to render)
+  - Image lazy loading (native + additional intersection observer)
+  - Tab hibernation after 30 min inactivity (configurable, 5–120 min range)
+  - Startup: only restore last active tab immediately, restore others lazily
+  - Extension loading: deferred until first tab is painted
+
+================================================================================
+  SECTION 6 — KEYBOARD & MOUSE INTERFACE
+================================================================================
+
+--- 6.1 KEYBOARD SHORTCUTS (GLOBAL) ---
+
+NAVIGATION:
+  Ctrl+L          Focus address bar
+  Ctrl+K          Open command palette
+  Alt+←           Back
+  Alt+→           Forward
+  Ctrl+R          Reload
+  Ctrl+Shift+R    Hard reload (bypass cache)
+  Escape          Stop loading / defocus omnibar
+  Ctrl+H          Open history
+  Ctrl+B          Open bookmarks
+
+TABS:
+  Ctrl+T          New tab
+  Ctrl+W          Close tab
+  Ctrl+Shift+T    Reopen closed tab
+  Ctrl+Tab        Next tab (MRU order)
+  Ctrl+Shift+Tab  Previous tab (MRU order)
+  Ctrl+1..8       Switch to tab 1–8
+  Ctrl+9          Switch to last tab
+  Ctrl+M          Toggle mute
+
+WINDOW:
+  Ctrl+N          New window
+  Ctrl+Shift+N    New private window
+  Ctrl+Q          Quit (with confirmation if forms are open)
+  F11             Toggle fullscreen
+  Ctrl+\          Toggle sidebar
+
+PAGE:
+  Ctrl+F          Find in page
+  Ctrl+U          View page source
+  Ctrl+P          Print
+  Ctrl+S          Save page
+  Ctrl++          Zoom in
+  Ctrl+-          Zoom out
+  Ctrl+0          Reset zoom
+  Ctrl+G          Find next
+  Ctrl+Shift+G    Find previous
+
+DEVTOOLS:
+  F12             Toggle DevTools
+  Ctrl+Shift+I    Toggle DevTools (Elements panel)
+  Ctrl+Shift+J    Toggle DevTools (Console panel)
+  Ctrl+Shift+M    Toggle responsive design mode
+  Ctrl+Shift+C    Inspect element (click to select)
+
+ALL SHORTCUTS CUSTOMIZABLE via Settings > Shortcuts (TOML-based).
+
+--- 6.2 MOUSE GESTURES (OPTIONAL, DISABLED BY DEFAULT) ---
+
+  Hold right button + swipe left:   Back
+  Hold right button + swipe right:  Forward
+  Hold right button + swipe up:     Scroll to top
+  Hold right button + swipe down:   Scroll to bottom
+  Hold right button + circle CW:    Close tab
+  Hold right button + circle CCW:   Reopen closed tab
+
+--- 6.3 TOUCH GESTURES (TOUCHSCREEN / TOUCHPAD) ---
+
+  2-finger swipe left/right:   Back / Forward
+  Pinch to zoom:               Page zoom (not browser zoom)
+  3-finger swipe up:           Show all tabs (tab overview)
+  4-finger swipe:              Switch workspace
+
+================================================================================
+  SECTION 7 — EXTENSION SYSTEM
+================================================================================
+
+STANDARD: WebExtensions API (Chrome/Firefox compatible)
+  - Subset supported at launch: tabs, storage, cookies, webRequest,
+    declarativeNetRequest, notifications, contextMenus, commands,
+    browserAction, pageAction, scripting
+  - Not supported at launch: nativeMessaging (roadmap), identity API,
+    devtools panels API (own implementation)
+
+EXTENSION INSTALLATION:
+  - Drag-and-drop .crx or .xpi file
+  - Install from local directory (developer mode)
+  - Extension store: partner with open-web extension directories
+
+EXTENSION SECURITY:
+  - Each extension runs in isolated renderer process
+  - Manifest V3 preferred (no persistent background pages)
+  - User approves permission groups on install (not per-permission)
+  - Extensions cannot access about: pages or Bitter settings
+  - Content scripts sandboxed (no access to page globals unless granted)
+
+================================================================================
+  SECTION 8 — PROFILES & SYNC
+================================================================================
+
+PROFILES:
+  - Multiple browser profiles (like Chrome profiles)
+  - Each profile has independent: bookmarks, history, cookies, extensions,
+    settings, DevTools preferences, passwords
+  - Quick switch: Ctrl+Shift+P (cycle profiles)
+  - Profile-specific accent color for quick visual identification
+
+SYNC (optional, self-hosted):
+  - Protocol: E2EE sync via CRDTs (Conflict-free Replicated Data Types)
+  - Syncs: bookmarks, history, settings, open tabs (not passwords — those stay
+    in system keyring)
+  - Server: self-host via Docker compose (open source sync server)
+  - No mandatory account — sync is opt-in and self-sovereign
+
+================================================================================
+  SECTION 9 — ARCH LINUX INTEGRATION
+================================================================================
+
+DISTRIBUTION:
+  - PKGBUILD on AUR (bitter-browser-git and bitter-browser stable)
+  - Flatpak on Flathub (for non-Arch distros, secondary priority)
+  - Binary releases on GitHub with .tar.zst and GPG signatures
+
+WAYLAND:
+  - Native Wayland via GTK4 (no XWayland required)
+  - xdg-shell: proper window decoration negotiation
+  - xdg-decoration: server-side decorations preferred, CSD fallback
+  - wp-fractional-scale: crisp rendering at fractional DPR (1.25x, 1.5x, 1.75x)
+  - xdg-activation: proper focus stealing prevention
+  - ext-idle-notify: detect system idle for tab hibernation
+  - Clipboard: wl-clipboard compatible, supports MIME types richly
+
+XDG COMPLIANCE:
+  Config:    $XDG_CONFIG_HOME/bitter-browser/   (default: ~/.config/bitter-browser/)
+  Data:      $XDG_DATA_HOME/bitter-browser/     (default: ~/.local/share/bitter-browser/)
+  Cache:     $XDG_CACHE_HOME/bitter-browser/    (default: ~/.cache/bitter-browser/)
+  Downloads: $XDG_DOWNLOAD_DIR                  (via xdg-user-dirs)
+
+SYSTEM INTEGRATION:
+  - libnotify for desktop notifications (download complete, update available)
+  - xdg-portal for: file chooser, screenshot, screen cast, print dialog
+  - DBus service: org.bitterbrowser.Browser (for external control, e.g., scripts)
+  - .desktop file with proper MimeType associations
+  - update-desktop-database and update-mime-database in PKGBUILD
+  - System CA certificates: /etc/ssl/certs/ca-certificates.crt
+  - Spell check: Enchant (hunspell backend, uses system dictionaries)
+
+DARK MODE:
+  - Reads org.gnome.desktop.interface.color-scheme via DBus
+  - Reads KDE color scheme via DBus (org.kde.KDE.Globals)
+  - Follows system preference automatically, user can override per-profile
+
+================================================================================
+  SECTION 10 — PROJECT STRUCTURE (CODE ARCHITECTURE)
+================================================================================
+
+bitter-browser/
+├── Cargo.toml               # Workspace root
+├── Cargo.lock
+├── meson.build              # System build (install, schemas, desktop file)
+├── PKGBUILD                 # AUR build script
+├── flatpak/                 # Flatpak manifest
+│
+├── crates/
+│   ├── bitter-core/         # Core browser logic (no UI)
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── session.rs       # Tab/session lifecycle
+│   │   │   ├── history.rs       # SQLite FTS5 history
+│   │   │   ├── bookmarks.rs     # Bookmark storage + frecency
+│   │   │   ├── download.rs      # Download manager
+│   │   │   ├── config.rs        # TOML settings (serde)
+│   │   │   ├── profile.rs       # Multi-profile management
+│   │   │   ├── search.rs        # Search engine + suggestions
+│   │   │   └── frecency.rs      # Frecency ranking algorithm
+│   │
+│   ├── bitter-net/          # Network process (async, Tokio)
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── dns.rs           # DoH resolver (hickory-dns)
+│   │   │   ├── proxy.rs         # Proxy auto-detection + SOCKS5
+│   │   │   ├── cache.rs         # HTTP cache (disk LRU)
+│   │   │   └── hsts.rs          # HSTS store
+│   │
+│   ├── bitter-adblock/      # Ad/tracker blocking engine
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── engine.rs        # adblock-rust wrapper
+│   │   │   ├── lists.rs         # Filter list manager + updater
+│   │   │   └── cosmetic.rs      # Cosmetic filter injection
+│   │
+│   ├── bitter-devtools/     # DevTools backend + protocol
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── protocol.rs      # WebKit Inspector Protocol bridge
+│   │   │   ├── recorder.rs      # Network/performance recorder
+│   │   │   ├── lighthouse.rs    # WASM Lighthouse runner
+│   │   │   └── coverage.rs      # CSS/JS coverage collector
+│   │
+│   ├── bitter-ui/           # GTK4 UI (main binary target)
+│   │   ├── src/
+│   │   │   ├── main.rs
+│   │   │   ├── app.rs           # GApplication subclass
+│   │   │   ├── window.rs        # BitterWindow (AdwApplicationWindow)
+│   │   │   ├── sidebar/
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── tab_list.rs
+│   │   │   │   ├── tab_item.rs
+│   │   │   │   └── workspace.rs
+│   │   │   ├── toolbar/
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── omnibar.rs
+│   │   │   │   └── actions.rs
+│   │   │   ├── webview/
+│   │   │   │   ├── mod.rs       # WebKitGTK WebView wrapper
+│   │   │   │   ├── tab.rs       # Tab struct + lifecycle
+│   │   │   │   └── stack.rs     # Tab stack (split view)
+│   │   │   ├── devtools/
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── panel.rs     # DevTools dock panel
+│   │   │   │   ├── elements.rs
+│   │   │   │   ├── console.rs
+│   │   │   │   ├── network.rs
+│   │   │   │   ├── sources.rs
+│   │   │   │   ├── performance.rs
+│   │   │   │   ├── memory.rs
+│   │   │   │   └── application.rs
+│   │   │   ├── settings/
+│   │   │   │   ├── mod.rs
+│   │   │   │   └── pages/       # One module per settings category
+│   │   │   └── dialogs/
+│   │   │       ├── omnibar_popup.rs
+│   │   │       ├── command_palette.rs
+│   │   │       └── certificate.rs
+│   │   │
+│   │   ├── resources/
+│   │   │   ├── bitter.gresource.xml
+│   │   │   ├── ui/              # .ui files (Blueprint or XML)
+│   │   │   ├── icons/           # Phosphor SVG icons
+│   │   │   ├── fonts/           # Geist, Geist Mono (OFL licensed)
+│   │   │   └── style/
+│   │   │       ├── bitter.css   # Main stylesheet (Adwaita overrides)
+│   │   │       ├── dark.css
+│   │   │       └── light.css
+│   │   │
+│   │   └── data/
+│   │       ├── com.bitterbrowser.Browser.desktop
+│   │       ├── com.bitterbrowser.Browser.metainfo.xml
+│   │       ├── com.bitterbrowser.Browser.gschema.xml
+│   │       └── icons/           # App icon (multiple sizes, SVG)
+│   │
+│   └── bitter-cli/          # Optional CLI (--remote-debugging-port, --dump-pdf)
+│
+└── tests/
+    ├── integration/         # Full browser integration tests
+    ├── unit/                # Per-crate unit tests
+    └── web-platform/        # WPT (Web Platform Tests) subset
+
+================================================================================
+  SECTION 11 — DEVELOPMENT ROADMAP
+================================================================================
+
+PHASE 1 — FOUNDATION (Months 1–3):
+  [x] Project scaffold (Cargo workspace, Meson, PKGBUILD)
+  [x] Basic GTK4 window with WebKitGTK WebView
+  [x] Tab management (open, close, switch, Ctrl+T/W)
+  [x] Address bar with basic navigation
+  [x] Persistent settings (TOML)
+  [x] History (SQLite)
+  [x] Bookmarks
+  [x] XDG compliance
+
+PHASE 2 — CORE UX (Months 4–6):
+  [ ] Vertical sidebar tabs
+  [ ] Tab groups + workspaces
+  [ ] Command palette (Ctrl+K)
+  [ ] Advanced omnibar (frecency, search suggestions)
+  [ ] Tab suspension/hibernation
+  [ ] Reader mode
+  [ ] Download manager
+
+PHASE 3 — DEVTOOLS (Months 7–10):
+  [ ] Elements inspector
+  [ ] Console with autocompletion
+  [ ] Network panel with waterfall
+  [ ] Sources panel + debugger
+  [ ] Performance panel + flame graph
+  [ ] Responsive design mode
+  [ ] DevTools dock/undock
+
+PHASE 4 — PRIVACY & POLISH (Months 11–13):
+  [ ] Adblock engine integration (adblock-rust)
+  [ ] DNS-over-HTTPS
+  [ ] Fingerprint protection
+  [ ] Memory/Application/Security DevTools panels
+  [ ] Mouse gestures
+  [ ] Extension system (WebExtensions subset)
+  [ ] Lighthouse integration
+
+PHASE 5 — RELEASE (Month 14):
+  [ ] AUR package (stable + git)
+  [ ] Flathub submission
+  [ ] Documentation (man page, wiki)
+  [ ] 1.0 release announcement
+
+================================================================================
+  SECTION 12 — QUALITY, TESTING & CI
+================================================================================
+
+TESTING STRATEGY:
+  - Unit tests: per-crate with cargo test (>80% line coverage target)
+  - Integration tests: headless WebKitGTK tests using xvfb-run
+  - Web platform compliance: run WPT subset in CI
+  - Performance regression: benchmark suite run on every PR
+  - Memory leak detection: valgrind + cargo-sanitizers in nightly CI
+  - Security: cargo audit (advisory database), dependabot equivalent
+
+CI/CD (GitHub Actions):
+  - On PR: fmt check, clippy, cargo test, cargo audit
+  - On main merge: full test suite + AUR PKGBUILD validation
+  - Nightly: WPT run, memory sanitizer, performance benchmarks
+  - On tag: build release binaries, generate checksums, sign with GPG
+
+CODE QUALITY:
+  - rustfmt: enforced (default config, no exceptions)
+  - clippy: all warnings as errors (pedantic + nursery lints where safe)
+  - Docs: all public API items must have rustdoc comments
+  - Commit convention: Conventional Commits (feat/fix/chore/perf/docs/test)
+  - PR template: requires description, testing checklist, screenshot if UI change
+
+================================================================================
+  SECTION 13 — ACCESSIBILITY
+================================================================================
+
+  - Full keyboard navigability (no mouse-only interactions)
+  - AT-SPI2 accessibility tree exposed (screen reader compatible: Orca)
+  - All custom widgets implement ATK roles and descriptions
+  - Focus indicators visible at all times (never hidden)
+  - Minimum contrast: WCAG 2.1 AA (4.5:1 for text, 3:1 for UI components)
+  - prefers-reduced-motion: all animations disabled when active
+  - Zoom: up to 400% without horizontal scroll (except complex DevTools panels)
+  - Font size: user can override UI font size independently of page zoom
+  - Color: all status information also conveyed via shape, not just color
+
+================================================================================
+  SECTION 14 — LICENSING & GOVERNANCE
+================================================================================
+
+LICENSE: Mozilla Public License 2.0 (MPL-2.0)
+  - Copyleft at the file level (like Firefox)
+  - Compatible with Apache 2.0 and GPL dependencies
+  - Enterprise-friendly (can use in proprietary products if MPL files kept open)
+
+DEPENDENCIES LICENSE POLICY:
+  - No GPL dependencies in the binary unless LGPL or GPL-compatible exception
+  - All fonts bundled must be OFL (Open Font License) or similar
+  - Filter lists: MIT/CC-BY-SA (review each)
+
+GOVERNANCE:
+  - BDFL model initially (project founder has final say)
+  - Roadmap publicly maintained in GitHub Projects
+  - RFC process for major architectural decisions
+  - Security issues: private disclosure via security@bitterbrowser.com,
+    90-day coordinated disclosure policy
+
+================================================================================
+  APPENDIX A — KEY DEPENDENCIES (Cargo.toml reference)
+================================================================================
+
+[dependencies]
+gtk4 = { version = "0.9", features = ["v4_14"] }
+libadwaita = { version = "0.7", features = ["v1_6"] }
+webkit2gtk = { version = "2.0", features = ["v2_44"] }
+tokio = { version = "1", features = ["full"] }
+rusqlite = { version = "0.32", features = ["bundled", "backup", "hooks"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+adblock = "0.9"                    # adblock-rust by Brave
+hickory-dns = "0.24"               # DNS-over-HTTPS
+url = "2"
+reqwest = { version = "0.12", features = ["rustls-tls", "brotli", "gzip"] }
+regex = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+prost = "0.13"                     # Protobuf for IPC
+zbus = "4"                         # DBus (async, Rust-native)
+keyring = "3"                      # libsecret integration
+image = "0.25"                     # Thumbnail generation
+once_cell = "1"
+parking_lot = "0.12"
+itertools = "0.13"
+
+================================================================================
+  APPENDIX B — REFERENCE IMPLEMENTATIONS TO STUDY
+================================================================================
+
+  1. GNOME Web (Epiphany) — GTK4 + WebKitGTK reference, Rust not used but
+     architecture maps well: https://gitlab.gnome.org/GNOME/epiphany
+  2. Servo — Rust rendering engine, future integration target
+  3. Firefox DevTools — gold standard for DevTools UX patterns
+  4. Chrome DevTools — CDP protocol reference, especially Network and Performance
+  5. Arc Browser — spatial tab UX reference (observe, don't copy)
+  6. Ladybird Browser — clean architecture, no legacy: https://github.com/LadybirdBrowser/ladybird
+  7. adblock-rust — https://github.com/brave/adblock-rust
+  8. gtk4-rs book — https://gtk-rs.org/gtk4-rs/stable/latest/book/
+
+================================================================================
+  END OF SPECIFICATION
+  Bitter Browser — Build something worth biting into.
+================================================================================
