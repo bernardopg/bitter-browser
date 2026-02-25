@@ -31,4 +31,12 @@ impl Tab {
     pub fn title(&self) -> Option<String> {
         self.webview.title().map(|t| t.to_string())
     }
+
+    pub fn connect_title_changed<F: Fn(&str) + 'static>(&self, f: F) {
+        self.webview.connect_title_notify(move |webview| {
+            if let Some(title) = webview.title() {
+                f(title.as_str());
+            }
+        });
+    }
 }

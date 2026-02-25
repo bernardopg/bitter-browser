@@ -11,7 +11,7 @@ impl Bookmarks {
         path.push("bookmarks.sqlite");
 
         let conn = Connection::open(path)?;
-        
+
         conn.execute(
             "CREATE TABLE IF NOT EXISTS bookmarks (
                 id INTEGER PRIMARY KEY,
