@@ -3,7 +3,6 @@ project('bitter-browser', 'rust',
   meson_version: '>= 0.59.0',
 )
 
-i18n = import('i18n')
 gnome = import('gnome')
 
 cargo = find_program('cargo', required: true)

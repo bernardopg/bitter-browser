@@ -1,13 +1,10 @@
 use gtk4::prelude::*;
-use libadwaita as adw;
 use std::rc::Rc;
-use std::cell::RefCell;
 
 pub struct Workspace {
     container: gtk4::Box,
     workspace_1: gtk4::Button,
     workspace_2: gtk4::Button,
-    add_workspace: gtk4::Button,
 }
 
 impl Workspace {
@@ -47,7 +44,6 @@ impl Workspace {
             container,
             workspace_1,
             workspace_2,
-            add_workspace,
         }
     }
 
@@ -57,7 +53,7 @@ impl Workspace {
 
     pub fn connect_workspace_selected<F: Fn(&str) + 'static>(&self, f: F) {
         let f = Rc::new(f);
-        
+
         let f1 = f.clone();
         self.workspace_1.connect_clicked(move |_| {
             f1("default");

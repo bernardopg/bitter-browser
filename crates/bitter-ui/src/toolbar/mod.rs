@@ -1,5 +1,5 @@
-pub mod omnibar;
 pub mod actions;
+pub mod omnibar;
 
 use gtk4::prelude::*;
 use libadwaita as adw;
@@ -38,7 +38,15 @@ impl Toolbar {
         &self.omnibar
     }
 
-    pub fn actions(&self) -> &actions::Actions {
-        &self.actions
+    pub fn connect_back_clicked<F: Fn() + 'static>(&self, f: F) {
+        self.actions.connect_back_clicked(f);
+    }
+
+    pub fn connect_forward_clicked<F: Fn() + 'static>(&self, f: F) {
+        self.actions.connect_forward_clicked(f);
+    }
+
+    pub fn connect_reload_clicked<F: Fn() + 'static>(&self, f: F) {
+        self.actions.connect_reload_clicked(f);
     }
 }

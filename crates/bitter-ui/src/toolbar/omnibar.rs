@@ -1,5 +1,6 @@
 use gtk4::prelude::*;
 
+#[derive(Clone)]
 pub struct Omnibar {
     entry: gtk4::Entry,
 }
@@ -23,17 +24,17 @@ impl Omnibar {
         self.entry.set_text(text);
     }
 
-    pub fn text(&self) -> String {
-        self.entry.text().to_string()
+    pub fn grab_focus(&self) {
+        self.entry.grab_focus();
     }
 
-    pub fn connect_activate<F: Fn(&Self) + 'static>(&self, f: F) {
-        // We need to clone the entry to pass it to the closure, but we can't easily pass `Self`.
-        // For simplicity in this scaffold, we just connect to the entry's activate signal.
-        let entry_clone = self.entry.clone();
-        self.entry.connect_activate(move |_| {
-            let omnibar = Self { entry: entry_clone.clone() };
-            f(&omnibar);
+    pub fn select_all(&self) {
+        self.entry.select_region(0, -1);
+    }
+
+    pub fn connect_activate<F: Fn(String) + 'static>(&self, f: F) {
+        self.entry.connect_activate(move |entry| {
+            f(entry.text().to_string());
         });
     }
 }

@@ -1,9 +1,8 @@
-pub mod tab_list;
 pub mod tab_item;
+pub mod tab_list;
 pub mod workspace;
 
 use gtk4::prelude::*;
-use libadwaita as adw;
 
 pub struct Sidebar {
     container: gtk4::Box,
@@ -22,7 +21,7 @@ impl Sidebar {
 
         let workspace = workspace::Workspace::new();
         let tab_list = tab_list::TabList::new();
-        
+
         let new_tab_button = gtk4::Button::builder()
             .label("New Tab")
             .icon_name("tab-new-symbolic")

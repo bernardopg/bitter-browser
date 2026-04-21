@@ -44,4 +44,16 @@ impl Actions {
     pub fn widget(&self) -> &gtk4::Widget {
         self.box_container.upcast_ref()
     }
+
+    pub fn connect_back_clicked<F: Fn() + 'static>(&self, f: F) {
+        self.back_button.connect_clicked(move |_| f());
+    }
+
+    pub fn connect_forward_clicked<F: Fn() + 'static>(&self, f: F) {
+        self.forward_button.connect_clicked(move |_| f());
+    }
+
+    pub fn connect_reload_clicked<F: Fn() + 'static>(&self, f: F) {
+        self.reload_button.connect_clicked(move |_| f());
+    }
 }

@@ -1,6 +1,6 @@
+use crate::window::BitterWindow;
 use gtk4::prelude::*;
 use libadwaita as adw;
-use crate::window::BitterWindow;
 
 pub struct BitterApp {
     app: adw::Application,
@@ -14,6 +14,7 @@ impl BitterApp {
 
         app.connect_startup(|_| {
             adw::init().expect("Failed to initialize libadwaita");
+            crate::style::load();
         });
 
         app.connect_activate(|app| {

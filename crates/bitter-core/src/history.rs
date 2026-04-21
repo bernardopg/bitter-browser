@@ -1,5 +1,4 @@
 use rusqlite::{Connection, Result};
-use std::path::PathBuf;
 
 pub struct History {
     conn: Connection,
@@ -33,6 +32,24 @@ impl History {
             [],
         )?;
 
+        conn.execute_batch(
+            "CREATE TRIGGER IF NOT EXISTS history_ai AFTER INSERT ON history BEGIN
+                INSERT INTO history_fts(rowid, url, title)
+                VALUES (new.id, new.url, new.title);
+             END;
+             CREATE TRIGGER IF NOT EXISTS history_ad AFTER DELETE ON history BEGIN
+                INSERT INTO history_fts(history_fts, rowid, url, title)
+                VALUES ('delete', old.id, old.url, old.title);
+             END;
+             CREATE TRIGGER IF NOT EXISTS history_au AFTER UPDATE ON history BEGIN
+                INSERT INTO history_fts(history_fts, rowid, url, title)
+                VALUES ('delete', old.id, old.url, old.title);
+                INSERT INTO history_fts(rowid, url, title)
+                VALUES (new.id, new.url, new.title);
+             END;
+             INSERT INTO history_fts(history_fts) VALUES ('rebuild');",
+        )?;
+
         Ok(Self { conn })
     }
 
@@ -46,9 +63,13 @@ impl History {
             "INSERT INTO history (url, title, last_visit_time)
              VALUES (?1, ?2, ?3)
              ON CONFLICT(url) DO UPDATE SET
-                title = excluded.title,
-                visit_count = visit_count + 1,
-                last_visit_time = excluded.last_visit_time",
+                title = COALESCE(excluded.title, history.title),
+                visit_count = CASE
+                    WHEN excluded.last_visit_time > history.last_visit_time
+                    THEN history.visit_count + 1
+                    ELSE history.visit_count
+                END,
+                last_visit_time = MAX(history.last_visit_time, excluded.last_visit_time)",
             rusqlite::params![url, title, now],
         )?;
 
@@ -56,13 +77,37 @@ impl History {
     }
 
     pub fn search(&self, query: &str) -> Result<Vec<(String, String)>> {
+        if query.trim().is_empty() {
+            return self.recent(10);
+        }
+
         let mut stmt = self.conn.prepare(
             "SELECT url, title FROM history_fts
              WHERE history_fts MATCH ?1
-             ORDER BY rank LIMIT 10"
+             ORDER BY rank LIMIT 10",
         )?;
 
         let history_iter = stmt.query_map([query], |row| {
+            Ok((row.get(0)?, row.get(1).unwrap_or_default()))
+        })?;
+
+        let mut results = Vec::new();
+        for item in history_iter {
+            results.push(item?);
+        }
+
+        Ok(results)
+    }
+
+    pub fn recent(&self, limit: usize) -> Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT url, title
+             FROM history
+             ORDER BY last_visit_time DESC
+             LIMIT ?1",
+        )?;
+
+        let history_iter = stmt.query_map([limit as i64], |row| {
             Ok((row.get(0)?, row.get(1).unwrap_or_default()))
         })?;
 

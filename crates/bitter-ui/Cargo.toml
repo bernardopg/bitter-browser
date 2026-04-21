@@ -12,6 +12,7 @@ webkit6.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+url.workspace = true
 bitter-core = { path = "../bitter-core" }
 bitter-net = { path = "../bitter-net" }
 bitter-adblock = { path = "../bitter-adblock" }

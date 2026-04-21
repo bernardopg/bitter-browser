@@ -1,12 +1,12 @@
 mod app;
-mod window;
-mod webview;
+mod command_palette;
 mod sidebar;
+mod style;
 mod toolbar;
+mod webview;
+mod window;
 
 use app::BitterApp;
-use gtk4::prelude::*;
-use libadwaita as adw;
 
 fn main() {
     tracing_subscriber::fmt::init();
