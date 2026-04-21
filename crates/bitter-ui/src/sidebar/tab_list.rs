@@ -60,21 +60,32 @@ impl TabList {
         }
 
         self.list_box.append(item.widget());
-        self.items.borrow_mut().push(item);
+        {
+            self.items.borrow_mut().push(item);
+        }
         self.list_box.invalidate_filter();
     }
 
     pub fn remove_tab(&self, id: &str) {
-        let mut items = self.items.borrow_mut();
-        if let Some(index) = items.iter().position(|item| item.id() == id) {
-            let item = items.remove(index);
+        let item = {
+            let mut items = self.items.borrow_mut();
+            items
+                .iter()
+                .position(|item| item.id() == id)
+                .map(|index| items.remove(index))
+        };
+
+        if let Some(item) = item {
             self.list_box.remove(item.widget());
-            self.list_box.invalidate_filter();
         }
+
+        self.list_box.invalidate_filter();
     }
 
     pub fn set_active_workspace(&self, workspace_id: &str) {
-        *self.active_workspace_id.borrow_mut() = workspace_id.to_string();
+        {
+            *self.active_workspace_id.borrow_mut() = workspace_id.to_string();
+        }
         self.list_box.invalidate_filter();
     }
 

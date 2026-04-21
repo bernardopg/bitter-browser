@@ -14,6 +14,7 @@ impl BitterApp {
 
         app.connect_startup(|_| {
             adw::init().expect("Failed to initialize libadwaita");
+            adw::StyleManager::default().set_color_scheme(adw::ColorScheme::ForceDark);
             crate::style::load();
         });
 

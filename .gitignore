@@ -1,10 +1,23 @@
-target/
-builddir/
+# Rust build artifacts
+/target/
+
+# Meson build directory and Flatpak builder state
+/builddir/
 /.flatpak-builder/
-*.log
-/.vscode
-*.iml
+
+# Meson generated metadata
+**/meson-logs/
+**/meson-private/
+**/meson-info/
+**/compile_commands.json
+**/meson-vscode.env
+
+# Editor and IDE settings
+/.vscode/
 .idea/
+*.iml
+
+# Visual Studio / Windows files
 *.sln
 *.suo
 *.user
@@ -17,16 +30,29 @@ builddir/
 *.VC.db
 *.VC.opendb
 *.dbmdl
-*.bak
-*.backup
-*.BLOB
-*.log
 *.vspscc
 *.vssscc
+
+# Backup, temporary and swap files
+*~
+*.swp
+*.swo
 *.tmp
 *.tmp_proj
 *.tmp_test
 *.cache
+*.bak
+*.backup
+*.orig
+*.BLOB
+.#*
+
+# Logs
+*.log
+
+# Misc
 *.ilk
 *.meta
 *.obj
+.DS_Store
+Thumbs.db

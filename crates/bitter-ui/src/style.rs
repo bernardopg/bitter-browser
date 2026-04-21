@@ -47,7 +47,38 @@ button:hover {
 
 .omnibar:focus {
   border-color: #ff4d00;
-  box-shadow: 0 0 0 1px alpha(#ff4d00, 0.35);
+  box-shadow: 0 0 0 1px rgba(255, 77, 0, 0.35);
+}
+
+.omnibar-suggestions {
+  padding: 6px;
+  border-radius: 8px;
+  background: #141414;
+  border: 1px solid #2a2a2a;
+}
+
+.omnibar-suggestions list {
+  background: transparent;
+}
+
+.omnibar-suggestions row {
+  min-height: 48px;
+  border-radius: 6px;
+  margin: 1px 0;
+}
+
+.omnibar-suggestions row:selected {
+  background: #26211f;
+}
+
+.omnibar-suggestion-title {
+  font-size: 13px;
+  color: #f0f0f0;
+}
+
+.omnibar-suggestion-detail {
+  font-size: 12px;
+  color: #888888;
 }
 
 .command-palette {

@@ -24,6 +24,24 @@ struct BrowserData {
     bookmarks: Option<Bookmarks>,
 }
 
+#[derive(Clone)]
+struct OmnibarSuggestion {
+    kind: SuggestionKind,
+    title: String,
+    detail: String,
+    target: String,
+}
+
+#[derive(Clone)]
+enum SuggestionKind {
+    Search,
+    Url,
+    Tab,
+    Bookmark,
+    History,
+    Internal,
+}
+
 impl BitterWindow {
     pub fn new(app: &adw::Application) -> Self {
         let window = adw::ApplicationWindow::builder()
@@ -160,6 +178,7 @@ impl BitterWindow {
 
         connect_toolbar(&toolbar, &tabs, &stack);
         connect_omnibar(toolbar.omnibar(), &tabs, &stack, &data);
+        connect_omnibar_suggestions(toolbar.omnibar(), &tabs, &stack, &data);
         connect_shortcuts(
             &window,
             command_palette.clone(),
@@ -229,6 +248,111 @@ fn connect_omnibar(
             load_uri_or_internal_page(&uri, &tabs, &stack, &data);
         }
     });
+}
+
+fn connect_omnibar_suggestions(
+    omnibar: &Omnibar,
+    tabs: &Rc<RefCell<Vec<Tab>>>,
+    stack: &gtk4::Stack,
+    data: &Rc<BrowserData>,
+) {
+    let suggestions = Rc::new(RefCell::new(Vec::<OmnibarSuggestion>::new()));
+    let list_box = gtk4::ListBox::builder()
+        .selection_mode(gtk4::SelectionMode::Single)
+        .css_classes(vec!["omnibar-suggestion-list"])
+        .build();
+
+    let popover = gtk4::Popover::builder()
+        .autohide(true)
+        .has_arrow(false)
+        .position(gtk4::PositionType::Bottom)
+        .css_classes(vec!["omnibar-suggestions"])
+        .build();
+    popover.set_parent(omnibar.widget());
+
+    let scrolled_window = gtk4::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk4::PolicyType::Never)
+        .vscrollbar_policy(gtk4::PolicyType::Automatic)
+        .min_content_width(560)
+        .max_content_height(320)
+        .child(&list_box)
+        .build();
+    popover.set_child(Some(&scrolled_window));
+
+    {
+        let suggestions = suggestions.clone();
+        let list_box = list_box.clone();
+        let popover = popover.clone();
+        let tabs = tabs.clone();
+        let data = data.clone();
+        omnibar.connect_changed(move |text| {
+            let next_suggestions = build_omnibar_suggestions(&text, &tabs, &data);
+            rebuild_omnibar_suggestion_rows(&list_box, &suggestions, next_suggestions);
+
+            if suggestions.borrow().is_empty() {
+                popover.popdown();
+            } else {
+                popover.popup();
+            }
+        });
+    }
+
+    {
+        let suggestions = suggestions.clone();
+        let popover = popover.clone();
+        let tabs = tabs.clone();
+        let stack = stack.clone();
+        let data = data.clone();
+        list_box.connect_row_activated(move |_, row| {
+            if let Some(suggestion) = suggestions.borrow().get(row.index() as usize).cloned() {
+                activate_omnibar_suggestion(&suggestion, &tabs, &stack, &data);
+                popover.popdown();
+            }
+        });
+    }
+
+    {
+        let popover = popover.clone();
+        omnibar.connect_focus_out(move || {
+            popover.popdown();
+        });
+    }
+
+    {
+        let suggestions = suggestions.clone();
+        let list_box = list_box.clone();
+        let popover = popover.clone();
+        let tabs = tabs.clone();
+        let stack = stack.clone();
+        let data = data.clone();
+        omnibar.connect_key_pressed(move |keyval, _| match keyval {
+            gtk4::gdk::Key::Down => {
+                select_omnibar_suggestion_offset(&list_box, 1);
+                gtk4::glib::Propagation::Stop
+            }
+            gtk4::gdk::Key::Up => {
+                select_omnibar_suggestion_offset(&list_box, -1);
+                gtk4::glib::Propagation::Stop
+            }
+            gtk4::gdk::Key::Escape => {
+                popover.popdown();
+                gtk4::glib::Propagation::Stop
+            }
+            gtk4::gdk::Key::Return | gtk4::gdk::Key::KP_Enter => {
+                if popover.is_visible() {
+                    let index = list_box.selected_row().map(|row| row.index()).unwrap_or(0);
+                    if let Some(suggestion) = suggestions.borrow().get(index as usize).cloned() {
+                        activate_omnibar_suggestion(&suggestion, &tabs, &stack, &data);
+                        popover.popdown();
+                        return gtk4::glib::Propagation::Stop;
+                    }
+                }
+
+                gtk4::glib::Propagation::Proceed
+            }
+            _ => gtk4::glib::Propagation::Proceed,
+        });
+    }
 }
 
 fn connect_shortcuts(
@@ -483,6 +607,259 @@ fn copy_active_url(tabs: &Rc<RefCell<Vec<Tab>>>, stack: &gtk4::Stack) {
             display.clipboard().set_text(&uri);
         }
     });
+}
+
+fn build_omnibar_suggestions(
+    input: &str,
+    tabs: &Rc<RefCell<Vec<Tab>>>,
+    data: &BrowserData,
+) -> Vec<OmnibarSuggestion> {
+    let input = input.trim();
+    if input.is_empty() || input.starts_with("bitter://") {
+        return Vec::new();
+    }
+
+    let mut suggestions = Vec::new();
+    if let Some(target) = navigation_target(input) {
+        let title = if looks_like_absolute_uri(input) || looks_like_hostname(input) {
+            format!("Open {input}")
+        } else {
+            format!("Search DuckDuckGo for \"{input}\"")
+        };
+        let kind = if looks_like_absolute_uri(input) || looks_like_hostname(input) {
+            SuggestionKind::Url
+        } else {
+            SuggestionKind::Search
+        };
+        suggestions.push(OmnibarSuggestion {
+            kind,
+            title,
+            detail: target.clone(),
+            target,
+        });
+    }
+
+    suggestions.extend(open_tab_suggestions(input, tabs));
+    suggestions.extend(bookmark_suggestions(input, data));
+    suggestions.extend(history_suggestions(input, data));
+    suggestions.extend(internal_suggestions(input));
+
+    dedupe_suggestions(&mut suggestions);
+    suggestions.truncate(8);
+    suggestions
+}
+
+fn open_tab_suggestions(input: &str, tabs: &Rc<RefCell<Vec<Tab>>>) -> Vec<OmnibarSuggestion> {
+    let query = input.to_lowercase();
+    tabs.borrow()
+        .iter()
+        .filter_map(|tab| {
+            let uri = tab.uri()?;
+            let title = tab.title().unwrap_or_else(|| uri.clone());
+            let haystack = format!("{} {}", title.to_lowercase(), uri.to_lowercase());
+            haystack.contains(&query).then(|| OmnibarSuggestion {
+                kind: SuggestionKind::Tab,
+                title: format!("Switch to {title}"),
+                detail: uri,
+                target: tab.id().to_string(),
+            })
+        })
+        .collect()
+}
+
+fn bookmark_suggestions(input: &str, data: &BrowserData) -> Vec<OmnibarSuggestion> {
+    data.bookmarks
+        .as_ref()
+        .and_then(|bookmarks| {
+            bookmarks
+                .search(input)
+                .map_err(|err| tracing::warn!("Failed to search bookmarks: {err}"))
+                .ok()
+        })
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(url, title)| {
+            let label = if title.trim().is_empty() {
+                url.clone()
+            } else {
+                title
+            };
+            OmnibarSuggestion {
+                kind: SuggestionKind::Bookmark,
+                title: label,
+                detail: format!("Bookmark - {url}"),
+                target: url,
+            }
+        })
+        .collect()
+}
+
+fn history_suggestions(input: &str, data: &BrowserData) -> Vec<OmnibarSuggestion> {
+    data.history
+        .as_ref()
+        .and_then(|history| {
+            history
+                .search(input)
+                .map_err(|err| tracing::warn!("Failed to search history: {err}"))
+                .ok()
+        })
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(url, title)| {
+            let label = if title.trim().is_empty() {
+                url.clone()
+            } else {
+                title
+            };
+            OmnibarSuggestion {
+                kind: SuggestionKind::History,
+                title: label,
+                detail: format!("History - {url}"),
+                target: url,
+            }
+        })
+        .collect()
+}
+
+fn internal_suggestions(input: &str) -> Vec<OmnibarSuggestion> {
+    [
+        ("History", "bitter://history"),
+        ("Bookmarks", "bitter://bookmarks"),
+        ("Settings", "bitter://settings"),
+    ]
+    .into_iter()
+    .filter(|(title, target)| {
+        title.to_lowercase().contains(&input.to_lowercase()) || target.contains(input)
+    })
+    .map(|(title, target)| OmnibarSuggestion {
+        kind: SuggestionKind::Internal,
+        title: title.to_string(),
+        detail: target.to_string(),
+        target: target.to_string(),
+    })
+    .collect()
+}
+
+fn dedupe_suggestions(suggestions: &mut Vec<OmnibarSuggestion>) {
+    let mut seen = Vec::<String>::new();
+    suggestions.retain(|suggestion| {
+        if seen.iter().any(|target| target == &suggestion.target) {
+            false
+        } else {
+            seen.push(suggestion.target.clone());
+            true
+        }
+    });
+}
+
+fn rebuild_omnibar_suggestion_rows(
+    list_box: &gtk4::ListBox,
+    suggestions: &Rc<RefCell<Vec<OmnibarSuggestion>>>,
+    next_suggestions: Vec<OmnibarSuggestion>,
+) {
+    while let Some(child) = list_box.first_child() {
+        list_box.remove(&child);
+    }
+
+    for suggestion in &next_suggestions {
+        list_box.append(&build_omnibar_suggestion_row(suggestion));
+    }
+
+    *suggestions.borrow_mut() = next_suggestions;
+
+    if let Some(row) = list_box.row_at_index(0) {
+        list_box.select_row(Some(&row));
+    }
+}
+
+fn select_omnibar_suggestion_offset(list_box: &gtk4::ListBox, offset: i32) {
+    let current = list_box.selected_row().map(|row| row.index()).unwrap_or(0);
+    let last_index = count_list_box_rows(list_box).saturating_sub(1);
+    if last_index < 0 {
+        return;
+    }
+
+    let next = (current + offset).clamp(0, last_index);
+    if let Some(row) = list_box.row_at_index(next) {
+        list_box.select_row(Some(&row));
+    }
+}
+
+fn count_list_box_rows(list_box: &gtk4::ListBox) -> i32 {
+    let mut count = 0;
+    let mut child = list_box.first_child();
+    while let Some(widget) = child {
+        count += 1;
+        child = widget.next_sibling();
+    }
+    count
+}
+
+fn build_omnibar_suggestion_row(suggestion: &OmnibarSuggestion) -> gtk4::ListBoxRow {
+    let row = gtk4::ListBoxRow::builder().activatable(true).build();
+    let container = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .spacing(10)
+        .margin_start(10)
+        .margin_end(10)
+        .margin_top(6)
+        .margin_bottom(6)
+        .build();
+
+    let icon = gtk4::Image::builder()
+        .icon_name(suggestion_icon(&suggestion.kind))
+        .pixel_size(16)
+        .build();
+
+    let text_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .spacing(2)
+        .hexpand(true)
+        .build();
+
+    let title = gtk4::Label::builder()
+        .label(&suggestion.title)
+        .ellipsize(gtk4::pango::EllipsizeMode::End)
+        .xalign(0.0)
+        .css_classes(vec!["omnibar-suggestion-title"])
+        .build();
+
+    let detail = gtk4::Label::builder()
+        .label(&suggestion.detail)
+        .ellipsize(gtk4::pango::EllipsizeMode::End)
+        .xalign(0.0)
+        .css_classes(vec!["omnibar-suggestion-detail"])
+        .build();
+
+    text_box.append(&title);
+    text_box.append(&detail);
+    container.append(&icon);
+    container.append(&text_box);
+    row.set_child(Some(&container));
+    row
+}
+
+fn suggestion_icon(kind: &SuggestionKind) -> &'static str {
+    match kind {
+        SuggestionKind::Search => "edit-find-symbolic",
+        SuggestionKind::Url => "web-browser-symbolic",
+        SuggestionKind::Tab => "tab-new-symbolic",
+        SuggestionKind::Bookmark => "user-bookmarks-symbolic",
+        SuggestionKind::History => "document-open-recent-symbolic",
+        SuggestionKind::Internal => "emblem-system-symbolic",
+    }
+}
+
+fn activate_omnibar_suggestion(
+    suggestion: &OmnibarSuggestion,
+    tabs: &Rc<RefCell<Vec<Tab>>>,
+    stack: &gtk4::Stack,
+    data: &Rc<BrowserData>,
+) {
+    match suggestion.kind {
+        SuggestionKind::Tab => stack.set_visible_child_name(&suggestion.target),
+        _ => load_uri_or_internal_page(&suggestion.target, tabs, stack, data),
+    }
 }
 
 fn load_uri_or_internal_page(
