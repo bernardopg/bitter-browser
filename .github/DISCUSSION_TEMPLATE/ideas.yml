@@ -1,0 +1,8 @@
+title: '[Idea] '
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and proposed direction
+    validations:
+      required: true

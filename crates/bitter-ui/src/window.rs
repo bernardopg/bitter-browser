@@ -1,8 +1,8 @@
 use crate::command_palette::CommandPalette;
-use crate::sidebar::tab_list::TabList;
 use crate::sidebar::Sidebar;
-use crate::toolbar::omnibar::Omnibar;
+use crate::sidebar::tab_list::TabList;
 use crate::toolbar::Toolbar;
+use crate::toolbar::omnibar::Omnibar;
 use crate::webview::tab::Tab;
 use bitter_core::bookmarks::Bookmarks;
 use bitter_core::history::History;

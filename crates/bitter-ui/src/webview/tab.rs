@@ -1,6 +1,6 @@
 use gtk4::prelude::*;
-use webkit6::prelude::*;
 use webkit6::WebView;
+use webkit6::prelude::*;
 
 pub struct Tab {
     webview: WebView,

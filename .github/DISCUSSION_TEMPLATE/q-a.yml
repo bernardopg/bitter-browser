@@ -1,0 +1,8 @@
+title: '[Question] '
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question and context
+    validations:
+      required: true
