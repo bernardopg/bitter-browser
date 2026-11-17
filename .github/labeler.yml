@@ -1,0 +1,15 @@
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ['**/*.md', 'docs/**', 'LICENSE']
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ['.github/**', '.githooks/**']
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: ['**/Cargo.toml', 'Cargo.lock', '.github/dependabot.yml']
+packaging:
+  - changed-files:
+      - any-glob-to-any-file: ['flatpak/**', 'meson.build', 'PKGBUILD']
+rust:
+  - changed-files:
+      - any-glob-to-any-file: ['crates/**/*.rs']

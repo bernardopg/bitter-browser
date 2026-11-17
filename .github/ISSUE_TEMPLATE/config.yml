@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private vulnerability report
+    url: https://github.com/bernardopg/bitter-browser/security/advisories/new
+    about: Please report security issues privately.
+  - name: Discussions
+    url: https://github.com/bernardopg/bitter-browser/discussions
+    about: Ask questions and discuss ideas.
