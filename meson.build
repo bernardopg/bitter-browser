@@ -1,5 +1,5 @@
 project('bitter-browser', 'rust',
-  version: '0.1.0',
+  version: '0.1.1',
   meson_version: '>= 0.59.0',
 )
 
@@ -17,12 +17,10 @@ custom_target(
   install: true,
   install_dir: get_option('bindir'),
   command: [
-    'env',
-    'CARGO_HOME=' + meson.project_build_root() / 'cargo-home',
-    cargo, 'build',
-    '--release',
-    '--manifest-path', meson.project_source_root() / 'Cargo.toml',
-    '--bin', 'bitter-ui',
+    'sh', '-c',
+    'CARGO_TARGET_DIR="$1" "$2" build --locked --release --manifest-path "$3" --bin bitter-ui && cp "$1/release/bitter-ui" "$4"',
+    'sh', meson.project_build_root() / 'cargo-target', cargo,
+    meson.project_source_root() / 'Cargo.toml', '@OUTPUT@',
   ]
 )
 
@@ -30,6 +28,12 @@ custom_target(
 install_data(
   'crates/bitter-ui/data/com.bitterbrowser.Browser.desktop',
   install_dir: get_option('datadir') / 'applications'
+)
+
+# Install application icon
+install_data(
+  'crates/bitter-ui/data/icons/com.bitterbrowser.Browser.svg',
+  install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps'
 )
 
 # Install appdata

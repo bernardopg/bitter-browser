@@ -1,5 +1,5 @@
 pkgname=bitter-browser-git
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="The browser that bites back — fast, sharp, and precise."
 arch=('x86_64')

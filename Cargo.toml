@@ -10,7 +10,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Bitter Browser Contributors"]
 license = "MPL-2.0"
@@ -20,7 +20,7 @@ gtk4 = { version = "0.11", features = ["v4_14"] }
 libadwaita = { version = "0.9", features = ["v1_6"] }
 webkit6 = { version = "0.6", features = ["v2_44"] }
 tokio = { version = "1", features = ["full"] }
-rusqlite = { version = "0.40", features = ["bundled", "backup", "hooks"] }
+rusqlite = { version = "0.43", features = ["bundled", "backup", "hooks"] }
 serde = { version = "1", features = ["derive"] }
 toml = "1"
 adblock = "0.13"
