@@ -152,7 +152,7 @@ dependencies = [
 
 [[package]]
 name = "bitter-adblock"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "adblock",
  "tracing",
@@ -161,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "bitter-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bitter-core",
  "tokio",
@@ -170,7 +170,7 @@ dependencies = [
 
 [[package]]
 name = "bitter-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "dirs",
  "itertools 0.15.0",
@@ -185,7 +185,7 @@ dependencies = [
 
 [[package]]
 name = "bitter-devtools"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "tracing",
@@ -193,7 +193,7 @@ dependencies = [
 
 [[package]]
 name = "bitter-net"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "hickory-resolver",
  "reqwest",
@@ -204,7 +204,7 @@ dependencies = [
 
 [[package]]
 name = "bitter-ui"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bitter-adblock",
  "bitter-core",
