@@ -1,0 +1,51 @@
+name: Auto-merge owner pull requests
+# Metadata only: this workflow never checks out or runs pull request code.
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, closed]
+permissions: {}
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  enable:
+    name: Enable auto-merge
+    if: >-
+      github.event.action != 'closed' &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.user.login == github.repository_owner &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Merge once required checks pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --merge "$PR_URL"
+
+  verify-main:
+    name: Run main branch workflows
+    # Merges made with GITHUB_TOKEN do not trigger push workflows, so start
+    # CI and CodeQL on main explicitly after an automatic merge.
+    if: >-
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged &&
+      github.event.pull_request.merged_by.login == 'github-actions[bot]' &&
+      github.event.pull_request.base.ref == github.event.repository.default_branch
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch CI and CodeQL
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.pull_request.base.ref }}
+        run: |
+          gh workflow run ci.yml --ref "$BRANCH"
+          gh workflow run codeql.yml --ref "$BRANCH"
