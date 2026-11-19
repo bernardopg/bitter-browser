@@ -16,6 +16,7 @@ pub struct TabView {
     problem: adw::StatusPage,
     pub failed: Cell<bool>,
     pub cancelled: Cell<bool>,
+    pub certificate_failed: Cell<bool>,
     pub visited: Cell<bool>,
     pub requested: RefCell<String>,
 }
@@ -78,6 +79,7 @@ impl TabView {
             problem,
             failed: Cell::new(false),
             cancelled: Cell::new(false),
+            certificate_failed: Cell::new(false),
             visited: Cell::new(false),
             requested: RefCell::new(String::new()),
         }
@@ -86,6 +88,7 @@ impl TabView {
     pub fn loading_started(&self) {
         self.failed.set(false);
         self.cancelled.set(false);
+        self.certificate_failed.set(false);
         self.visited.set(false);
         self.container.set_visible_child_name("website");
     }

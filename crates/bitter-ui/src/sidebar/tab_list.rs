@@ -13,7 +13,11 @@ pub struct TabList {
 
 impl TabList {
     pub fn new() -> Self {
-        let stack = gtk4::Stack::new();
+        let stack = gtk4::Stack::builder()
+            .transition_type(gtk4::StackTransitionType::SlideLeftRight)
+            .transition_duration(220)
+            .interpolate_size(true)
+            .build();
         let lists = WorkspaceId::ALL.map(|workspace| {
             let list = gtk4::ListBox::builder().css_classes(["tab-list"]).build();
             stack.add_named(&list, Some(Self::name(workspace)));

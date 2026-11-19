@@ -61,6 +61,7 @@ XLIB.XFlush.argtypes = [ctypes.c_void_p]
 XLIB.XCloseDisplay.argtypes = [ctypes.c_void_p]
 XTST.XTestFakeKeyEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int, ctypes.c_ulong]
 F11 = 0xFFC8
+F9 = 0xFFC6
 
 
 def eventually(check, message, timeout=12):
@@ -514,6 +515,8 @@ def run_flow(browser, base):
     step(keys("Escape"), lambda r: r[1] == width, "Leaving full screen did not restore the chrome")
     step(lambda: browser.click(270, 187), lambda r: r[2], "The page could not enter full screen")
     step(keys("Escape"), lambda r: not r[2] and r[1] == width, "The page did not leave full screen")
+    step(lambda: browser.plain_key(F9), lambda r: r[1] > width + 150, "F9 did not hide the sidebar")
+    step(lambda: browser.plain_key(F9), lambda r: r[1] == width, "F9 did not show the sidebar again")
     browser.stop()
     return {"startup_ms": round(startup * 1000), "restore_ms": round(restart * 1000)}
 

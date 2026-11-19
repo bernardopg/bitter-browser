@@ -1,6 +1,38 @@
 use gtk4::prelude::*;
 use std::{cell::Cell, rc::Rc};
 
+/// What the address bar says about the current page's connection.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Security {
+    /// A web page loaded over HTTPS without certificate errors.
+    Secure,
+    /// Plain HTTP, or HTTPS whose certificate failed.
+    Insecure,
+    /// Internal pages and local files.
+    Local,
+}
+
+impl Security {
+    pub fn for_address(uri: &str, certificate_failed: bool) -> Self {
+        match uri
+            .split_once(':')
+            .map(|(scheme, _)| scheme.to_ascii_lowercase())
+        {
+            Some(scheme) if scheme == "https" && !certificate_failed => Self::Secure,
+            Some(scheme) if scheme == "https" || scheme == "http" => Self::Insecure,
+            _ => Self::Local,
+        }
+    }
+
+    fn icon(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Secure => ("channel-secure-symbolic", "Secure connection"),
+            Self::Insecure => ("channel-insecure-symbolic", "Connection is not secure"),
+            Self::Local => ("system-search-symbolic", "Search or enter address"),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Omnibar {
     entry: gtk4::Entry,
@@ -16,6 +48,8 @@ impl Omnibar {
             .max_width_chars(45)
             .hexpand(true)
             .css_classes(vec!["omnibar"])
+            .primary_icon_name("system-search-symbolic")
+            .primary_icon_activatable(false)
             .build();
 
         entry.update_property(&[gtk4::accessible::Property::Label("Address and search")]);
@@ -36,6 +70,22 @@ impl Omnibar {
             self.updating.set(true);
             self.entry.set_text(text);
             self.updating.set(false);
+        }
+    }
+
+    pub fn set_security(&self, security: Security) {
+        let (icon, tooltip) = security.icon();
+        self.entry.set_primary_icon_name(Some(icon));
+        self.entry.set_primary_icon_tooltip_text(Some(tooltip));
+        for (class, active) in [
+            ("secure", security == Security::Secure),
+            ("insecure", security == Security::Insecure),
+        ] {
+            if active {
+                self.entry.add_css_class(class);
+            } else {
+                self.entry.remove_css_class(class);
+            }
         }
     }
 
@@ -67,6 +117,9 @@ impl Omnibar {
         self.entry.connect_changed(move |entry| {
             if !updating.get() {
                 editing.set(true);
+                entry.set_primary_icon_name(Some("system-search-symbolic"));
+                entry.remove_css_class("secure");
+                entry.remove_css_class("insecure");
                 f(entry.text().to_string());
             }
         });
@@ -90,5 +143,39 @@ impl Omnibar {
         key_controller.connect_key_pressed(move |_, keyval, _, state| f(keyval, state));
         key_controller.set_propagation_phase(gtk4::PropagationPhase::Capture);
         self.entry.add_controller(key_controller);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Security;
+
+    #[test]
+    fn security_follows_the_scheme_and_certificate_state() {
+        assert_eq!(
+            Security::for_address("https://a.test/", false),
+            Security::Secure
+        );
+        assert_eq!(
+            Security::for_address("HTTPS://a.test/", false),
+            Security::Secure
+        );
+        assert_eq!(
+            Security::for_address("https://a.test/", true),
+            Security::Insecure
+        );
+        assert_eq!(
+            Security::for_address("http://a.test/", false),
+            Security::Insecure
+        );
+        assert_eq!(
+            Security::for_address("bitter://history", false),
+            Security::Local
+        );
+        assert_eq!(
+            Security::for_address("file:///tmp/a", false),
+            Security::Local
+        );
+        assert_eq!(Security::for_address("", false), Security::Local);
     }
 }
