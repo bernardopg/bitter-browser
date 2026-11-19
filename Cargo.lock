@@ -16,7 +16,7 @@ checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
 name = "bitter-adblock"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "regex-lite",
  "serde_json",
@@ -24,11 +24,11 @@ dependencies = [
 
 [[package]]
 name = "bitter-cli"
-version = "0.2.1"
+version = "0.3.0"
 
 [[package]]
 name = "bitter-core"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "dirs",
  "libc",
@@ -43,15 +43,15 @@ dependencies = [
 
 [[package]]
 name = "bitter-devtools"
-version = "0.2.1"
+version = "0.3.0"
 
 [[package]]
 name = "bitter-net"
-version = "0.2.1"
+version = "0.3.0"
 
 [[package]]
 name = "bitter-ui"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "bitter-adblock",
  "bitter-core",

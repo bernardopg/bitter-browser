@@ -52,6 +52,21 @@
     <category>WebBrowser</category>
   </categories>
   <releases>
+    <release version="0.3.0" date="2026-11-19">
+      <url type="details">https://github.com/bernardopg/bitter-browser/releases/tag/v0.3.0</url>
+      <description>
+        <p>Sign-in pop-ups, site permissions, ad and tracker blocking, HTTPS-only mode and reorganized preferences.</p>
+        <ul>
+          <li>Pages opened with window.open become tabs that keep their opener, so sign-in and payment windows work</li>
+          <li>Sites ask before using notifications, location, camera, microphone or the clipboard, and answers are remembered per site</li>
+          <li>Ads and trackers are blocked with EasyList and EasyPrivacy, with a per-site switch</li>
+          <li>HTTPS-only mode, tracking prevention, third-party cookie blocking and clearing browsing data</li>
+          <li>Context menu items open links in tabs, hovered links show their address, and F12 opens the Web Inspector</li>
+          <li>Choose where downloads are saved; the download list and per-site zoom survive restarts</li>
+          <li>Redesigned New Tab, History and Bookmarks pages and a collapsible sidebar</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.1" date="2026-11-19">
       <url type="details">https://github.com/bernardopg/bitter-browser/releases/tag/v0.2.1</url>
       <description>
