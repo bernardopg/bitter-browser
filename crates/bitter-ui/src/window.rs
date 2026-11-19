@@ -72,8 +72,10 @@ impl BitterWindow {
             .title("Bitter Browser")
             .default_width(1200)
             .default_height(800)
-            .css_classes(["browser-chrome"])
             .build();
+        // Builder `css_classes` would replace the window's default `background`
+        // class, leaving the content area unpainted and text colors unset.
+        window.add_css_class("browser-chrome");
         let sidebar = Sidebar::new();
         let toolbar = Toolbar::new();
         let stack = gtk4::Stack::builder().hexpand(true).vexpand(true).build();

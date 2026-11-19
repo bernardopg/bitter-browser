@@ -12,6 +12,7 @@ const APP_CSS: &str = r#"
 
 .browser-chrome .sidebar {
   background-color: @sidebar_bg_color;
+  color: @sidebar_fg_color;
   border-right: 1px solid @sidebar_border_color;
 }
 
