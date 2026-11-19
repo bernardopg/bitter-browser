@@ -7,7 +7,7 @@ pkgdesc='Focused, native web browser for the Linux desktop'
 arch=('x86_64')
 url='https://github.com/bernardopg/bitter-browser'
 license=('MPL-2.0')
-depends=('gcc-libs' 'glib2' 'glibc' 'gtk4' 'libadwaita' 'webkitgtk-6.0')
+depends=('dconf' 'glib2' 'glibc' 'gtk4' 'hicolor-icon-theme' 'libadwaita' 'libgcc' 'libsoup3' 'pango' 'webkitgtk-6.0')
 makedepends=('cargo' 'git' 'meson')
 # The bundled SQLite is C; makepkg LTO turns it into GCC bitcode that the Rust linker cannot read.
 options=('!lto')
