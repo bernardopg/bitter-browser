@@ -5,6 +5,50 @@ All notable changes to Bitter Browser are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-11-19
+
+### Added
+
+- Pages opened with `window.open` become the next tab and keep
+  `window.opener` and `postMessage`, so sign-in and payment pop-ups work;
+  `window.close()` returns to the page that opened them.
+- Site permissions: notifications, location, camera, microphone and
+  clipboard are asked in a bar above the page and remembered per site;
+  screen sharing is asked every time. Remembered answers are reported
+  through `navigator.permissions` and managed from the address bar and
+  Preferences.
+- Ad and tracker blocking with a built-in list, EasyList and EasyPrivacy,
+  converted to WebKit content blockers, refreshed every four days, with a
+  per-site switch.
+- HTTPS-only mode, with a warning page for sites that have no secure version.
+- Cross-site tracking prevention and third-party cookie settings, and
+  clearing history, cookies and site data, cache and the download list by
+  time range (Ctrl+Shift+Delete).
+- Context menu items that open links, images and media in a new or
+  background tab, and search for the selected text. Hovered links show
+  their address.
+- Web Inspector (F12, Ctrl+Shift+I), printing (Ctrl+P) and spell checking in
+  the system languages.
+- A site panel behind the address bar's connection icon.
+- Choosing where each download is saved; the download list and per-site
+  zoom are kept between launches, with a default zoom setting.
+- Redesigned New Tab, History and Bookmarks pages with frequent sites and
+  filters, a security indicator, loading progress and a collapsible sidebar
+  (F9).
+
+### Changed
+
+- Preferences are split into General, Privacy, Permissions and Advanced
+  pages, with search. The placeholder privacy rows are gone.
+- WebRTC is enabled. The Flatpak can play sound and use the microphone, and
+  the Arch package lists GStreamer plugins for video and hardware decoding
+  as optional dependencies.
+
+### Fixed
+
+- Enter in the command palette search field runs the highlighted command.
+- Error pages no longer show the secure connection icon.
+
 ## [0.2.1] - 2026-11-19
 
 ### Fixed
@@ -63,6 +107,7 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 - Meson installation of the executable and the application icon.
 
+[0.3.0]: https://github.com/bernardopg/bitter-browser/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/bernardopg/bitter-browser/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/bernardopg/bitter-browser/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/bernardopg/bitter-browser/releases/tag/v0.1.1
