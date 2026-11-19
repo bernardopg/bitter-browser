@@ -13,6 +13,9 @@ pub struct Preferences {
     pub search: SearchEngine,
     pub theme: Theme,
     pub restore_session: bool,
+    /// Ask for a destination for every download instead of saving to the
+    /// download directory.
+    pub ask_download_location: bool,
 }
 
 impl Default for Preferences {
@@ -21,6 +24,7 @@ impl Default for Preferences {
             search: SearchEngine::default(),
             theme: Theme::default(),
             restore_session: true,
+            ask_download_location: false,
         }
     }
 }
@@ -162,6 +166,8 @@ impl ConfigStore {
         search.insert("restore_session", value(preferences.restore_session));
         let appearance = ensure_table(&mut document, "appearance")?;
         appearance.insert("theme", value(preferences.theme.key()));
+        let downloads = ensure_table(&mut document, "downloads")?;
+        downloads.insert("ask_location", value(preferences.ask_download_location));
 
         let bytes = document.to_string().into_bytes();
         if bytes.len() > MAX_BYTES {
@@ -238,21 +244,30 @@ fn validate(document: &DocumentMut) -> Result<Preferences, ConfigFailure> {
     let theme = read_setting(document, "appearance", "theme", |key| {
         Theme::ALL.into_iter().find(|theme| theme.key() == key)
     })?;
-    let restore_session = document
-        .get("general")
-        .and_then(toml_edit::Item::as_table_like)
-        .and_then(|table| table.get("restore_session"))
-        .map(|item| {
-            item.as_bool()
-                .ok_or(ConfigFailure::InvalidValue("general", "restore_session"))
-        })
-        .transpose()?
-        .unwrap_or(true);
+    let restore_session = read_bool(document, "general", "restore_session")?.unwrap_or(true);
+    let ask_download_location = read_bool(document, "downloads", "ask_location")?.unwrap_or(false);
     Ok(Preferences {
         search,
         theme,
         restore_session,
+        ask_download_location,
     })
+}
+
+fn read_bool(
+    document: &DocumentMut,
+    table: &'static str,
+    key: &'static str,
+) -> Result<Option<bool>, ConfigFailure> {
+    document
+        .get(table)
+        .and_then(toml_edit::Item::as_table_like)
+        .and_then(|values| values.get(key))
+        .map(|item| {
+            item.as_bool()
+                .ok_or(ConfigFailure::InvalidValue(table, key))
+        })
+        .transpose()
 }
 
 fn read_setting<T: Default>(
@@ -386,6 +401,33 @@ mod tests {
             ConfigStore::open(path).unwrap().current().theme,
             Theme::Light
         );
+    }
+
+    #[test]
+    fn download_location_preference_round_trips_and_rejects_bad_values() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let mut store = ConfigStore::open(path.clone()).unwrap();
+        assert!(!store.current().ask_download_location);
+        store
+            .save(Preferences {
+                ask_download_location: true,
+                ..store.current()
+            })
+            .unwrap();
+        assert!(
+            std::fs::read_to_string(&path)
+                .unwrap()
+                .contains("ask_location = true")
+        );
+        assert!(
+            ConfigStore::open(path.clone())
+                .unwrap()
+                .current()
+                .ask_download_location
+        );
+        std::fs::write(&path, "version = 1\n[downloads]\nask_location = \"yes\"\n").unwrap();
+        assert!(ConfigStore::open(path).is_err());
     }
 
     #[test]

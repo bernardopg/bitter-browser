@@ -7,6 +7,7 @@ use crate::sidebar::Sidebar;
 use crate::suggestion_worker::SuggestionWorker;
 use crate::toolbar::Toolbar;
 use crate::webview::tab::{Tab, TabView};
+use bitter_core::records::ZoomLevels;
 use bitter_core::session::{
     self, HOME_URI, MAX_TABS, SavedTab, SavedWorkspace, Session, WorkspaceId,
 };
@@ -53,6 +54,7 @@ struct Browser {
     fullscreen: Cell<bool>,
     page_fullscreen: Cell<bool>,
     zoom_toast: RefCell<Option<adw::Toast>>,
+    zoom_levels: RefCell<ZoomLevels>,
     history: History,
     bookmarks: Bookmarks,
     preferences: PreferenceState,
@@ -137,6 +139,10 @@ impl BitterWindow {
                 }
             }
         }
+        let (zoom_levels, zoom_error) = ZoomLevels::open(profile.data_dir().join("zoom.json"));
+        if let Some(error) = zoom_error {
+            tracing::warn!("Could not read saved zoom levels: {error}");
+        }
         let network = webkit6::NetworkSession::new(
             Some(profile.web_data_dir()),
             Some(profile.web_cache_dir()),
@@ -144,7 +150,11 @@ impl BitterWindow {
         if let Some(data) = network.website_data_manager() {
             data.set_favicons_enabled(true);
         }
-        let downloads = Downloads::new(&feedback);
+        let downloads = Downloads::new(
+            &feedback,
+            config.clone(),
+            profile.data_dir().join("downloads.json"),
+        );
         downloads.attach(&network);
         toolbar.pack_end(downloads.widget());
         let browser = Rc::new(Browser {
@@ -159,6 +169,7 @@ impl BitterWindow {
             fullscreen: Cell::new(false),
             page_fullscreen: Cell::new(false),
             zoom_toast: Default::default(),
+            zoom_levels: RefCell::new(zoom_levels),
             history,
             bookmarks,
             preferences: config,
@@ -684,18 +695,32 @@ impl Browser {
         self.feedback.add_toast(adw::Toast::new(message));
     }
 
-    /// Steps the active tab's zoom, or resets it when `zoom_in` is `None`.
+    fn saved_zoom(&self, uri: &str) -> f64 {
+        zoom_host(uri)
+            .and_then(|host| self.zoom_levels.borrow().get(&host))
+            .unwrap_or(1.0)
+    }
+
+    /// Steps the active tab's zoom, or resets it when `zoom_in` is `None`,
+    /// and remembers the level for the page's site.
     fn zoom(&self, zoom_in: Option<bool>) {
-        self.with_view(|_, view| {
+        self.with_view(|tab, view| {
             let level = match zoom_in {
                 Some(zoom_in) => next_zoom(view.web.zoom_level(), zoom_in),
                 None => 1.0,
             };
             view.web.set_zoom_level(level);
-            let toast = adw::Toast::builder()
-                .title(format!("Zoom {:.0}%", level * 100.0))
-                .timeout(2)
-                .build();
+            let host = zoom_host(&tab.uri());
+            if let Some(host) = &host
+                && let Err(error) = self.zoom_levels.borrow_mut().set(host, level)
+            {
+                tracing::warn!("Could not save the zoom level: {error}");
+            }
+            let title = match &host {
+                Some(host) => format!("Zoom {:.0}% for {host}", level * 100.0),
+                None => format!("Zoom {:.0}%", level * 100.0),
+            };
+            let toast = adw::Toast::builder().title(title).timeout(2).build();
             if let Some(previous) = self.zoom_toast.replace(Some(toast.clone())) {
                 previous.dismiss();
             }
@@ -854,6 +879,7 @@ impl Browser {
                 webkit6::LoadEvent::Committed => {
                     if let Some(uri) = web.uri() {
                         tab.update(&uri, &uri);
+                        web.set_zoom_level(browser.saved_zoom(&uri));
                     }
                 }
                 webkit6::LoadEvent::Finished if !view.failed.get() => {
@@ -1201,6 +1227,14 @@ const ZOOM_LEVELS: [f64; 13] = [
     0.3, 0.5, 0.67, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0,
 ];
 
+/// The site key for remembered zoom: the host of web addresses only.
+fn zoom_host(uri: &str) -> Option<String> {
+    let url = url::Url::parse(uri).ok()?;
+    matches!(url.scheme(), "http" | "https")
+        .then(|| url.host_str().map(str::to_ascii_lowercase))
+        .flatten()
+}
+
 /// Returns the next preset zoom level above or below `current`.
 fn next_zoom(current: f64, zoom_in: bool) -> f64 {
     const EPSILON: f64 = 0.001;
@@ -1501,6 +1535,21 @@ mod tests {
         assert_eq!(next_zoom(3.0, true), 3.0);
         assert_eq!(next_zoom(0.3, false), 0.3);
         assert_eq!(next_zoom(5.0, false), 3.0);
+    }
+
+    #[test]
+    fn zoom_is_remembered_per_web_host_only() {
+        assert_eq!(
+            zoom_host("https://Docs.Example.test/a?b").as_deref(),
+            Some("docs.example.test")
+        );
+        assert_eq!(
+            zoom_host("http://127.0.0.1:8080/x").as_deref(),
+            Some("127.0.0.1")
+        );
+        assert_eq!(zoom_host("bitter://history"), None);
+        assert_eq!(zoom_host("file:///tmp/a.html"), None);
+        assert_eq!(zoom_host("not a url"), None);
     }
 
     #[test]
