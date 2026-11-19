@@ -52,6 +52,12 @@
     <category>WebBrowser</category>
   </categories>
   <releases>
+    <release version="0.2.0" date="2026-11-19">
+      <url type="details">https://github.com/bernardopg/bitter-browser/releases/tag/v0.2.0</url>
+      <description>
+        <p>Downloads, find in page, zoom, full screen, site icons, workspaces, session restore and address bar suggestions.</p>
+      </description>
+    </release>
     <release version="0.1.1" date="2026-11-17"/>
   </releases>
 </component>
