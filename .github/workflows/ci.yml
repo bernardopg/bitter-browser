@@ -56,3 +56,16 @@ jobs:
           path: lcov.info
           if-no-files-found: error
           retention-days: 14
+
+  flatpak-sources:
+    name: Flatpak sources
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check vendored Cargo sources and release versions
+        run: |
+          python3 scripts/check-flatpak-sources.py
+          python3 scripts/check-version.py

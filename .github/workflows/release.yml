@@ -1,0 +1,86 @@
+name: Release
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+permissions: {}
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-26.04
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ github.ref_name }}
+      APP_ID: com.bitterbrowser.Browser
+      FLATHUB: https://dl.flathub.org/repo/flathub.flatpakrepo
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check the tag
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          python3 scripts/check-version.py "$TAG"
+          python3 scripts/check-flatpak-sources.py
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub "$FLATHUB"
+          flatpak install --user -y --noninteractive flathub \
+            org.gnome.Platform//51 org.gnome.Sdk//51 org.freedesktop.Sdk.Extension.rust-stable//26.08
+      - name: Build Flatpak bundle offline
+        run: |
+          mkdir dist
+          flatpak-builder --user --disable-rofiles-fuse --force-clean --repo=repo build \
+            flatpak/com.bitterbrowser.Browser.json
+          flatpak build-bundle repo "dist/bitter-browser-$VERSION-x86_64.flatpak" "$APP_ID" \
+            --runtime-repo="$FLATHUB"
+      - name: Create source archive and Arch package recipe
+        run: |
+          archive="bitter-browser-$VERSION.tar.gz"
+          git archive --format=tar.gz --prefix="bitter-browser-$VERSION/" -o "dist/$archive" "$GITHUB_SHA"
+          checksum=$(sha256sum "dist/$archive" | cut -d' ' -f1)
+          sed "s/^sha256sums=('SKIP')$/sha256sums=('$checksum')/" packaging/arch/PKGBUILD > dist/PKGBUILD
+          grep -q "sha256sums=('$checksum')" dist/PKGBUILD
+      - name: Generate SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: spdx-json
+          output-file: dist/bitter-browser-${{ env.VERSION }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Write checksums
+        run: |
+          cd dist
+          sha256sum -- * > "bitter-browser-$VERSION-sha256.txt"
+          cat "bitter-browser-$VERSION-sha256.txt"
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 - "$VERSION" > notes.md <<'PY'
+          import re, sys
+          version = sys.argv[1]
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          match = re.search(rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## \[|\Z)", text, re.M | re.S)
+          if not match or not match.group(1).strip():
+              sys.exit(f"CHANGELOG.md has no notes for {version}")
+          print(match.group(1).strip())
+          PY
+          gh release create "$TAG" dist/* --verify-tag --title "Bitter Browser $VERSION" \
+            --notes-file notes.md
