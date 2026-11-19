@@ -309,6 +309,12 @@ def run_flow(browser, base):
     selected_uri(f"{base}/background", index=3)
     time.sleep(0.25)
     browser.frame("restored")
+    handed_over = subprocess.run([browser.binary, f"{base}/external"], env=browser.env,
+                                 capture_output=True, text=True, timeout=20)
+    assert handed_over.returncode == 0, handed_over.stderr
+    expect("/external")
+    eventually(lambda: tab_paths(browser.current(), 0)[-1] == f"{base}/external",
+               "Address from another application did not open in the running window")
     browser.stop()
     return {"startup_ms": round(startup * 1000), "restore_ms": round(restart * 1000)}
 

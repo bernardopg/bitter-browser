@@ -16,6 +16,8 @@ requests a new window opens it in the current workspace. Address suggestions
 can switch to an existing tab in either workspace. History and bookmarks are
 queried locally after a 90 ms typing pause, with SQLite reads on a worker.
 Entering a search and confirming sends it to the configured provider.
+Links opened from other applications open in a new tab of the running
+window. Only `http`, `https` and `file` addresses are accepted.
 
 The toolbar shows loading progress with a Stop button while a page loads.
 Connection and certificate failures show explanatory native pages with
@@ -33,8 +35,9 @@ xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- \
 
 The harness uses disposable profiles and loopback only. It checks navigation,
 history suggestions, workspace synchronization, background link behavior,
-reopening and reordering tabs, network error recovery, and session restoration
-after terminating the browser process. It also checks that the 50-tab and
+reopening and reordering tabs, network error recovery, session restoration
+after terminating the browser process, and links handed over by a second
+launch. It also checks that the 50-tab and
 100-tab fixtures request only the selected page at launch. Time ends when
 the window becomes visible. RSS covers the browser process and excludes
 separate WebKit helper processes. These are X11 local measurements.

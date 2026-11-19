@@ -234,6 +234,23 @@ impl Browser {
             window.add_action(&action);
             app.set_accels_for_action(&format!("win.{id}"), accelerators);
         }
+        let open_uri = gio::SimpleAction::new("open_uri", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        open_uri.connect_activate(move |_, parameter| {
+            let Some(browser) = weak.upgrade() else {
+                return;
+            };
+            match parameter
+                .and_then(|value| value.str())
+                .and_then(external_uri)
+            {
+                Some(uri) => {
+                    browser.new_tab(browser.workspace.get(), &uri, true);
+                }
+                None => browser.toast("This address scheme is unavailable."),
+            }
+        });
+        window.add_action(&open_uri);
         let keys = gtk4::EventControllerKey::new();
         let weak = Rc::downgrade(self);
         keys.connect_key_pressed(move |_, key, _, _| {
@@ -979,6 +996,18 @@ enum Target {
     Search(String),
 }
 
+/// Accepts addresses handed over by the desktop, such as links opened from
+/// other applications, and rejects schemes the browser does not load.
+fn external_uri(uri: &str) -> Option<String> {
+    let parsed = url::Url::parse(uri.trim()).ok()?;
+    let supported = match parsed.scheme() {
+        "http" | "https" => parsed.host().is_some(),
+        "file" => true,
+        _ => false,
+    };
+    supported.then(|| parsed.into())
+}
+
 fn navigation_target(input: &str, engine: SearchEngine) -> Result<Option<Target>, &'static str> {
     let input = input.trim();
     if input.is_empty() {
@@ -1215,6 +1244,28 @@ fn escape_html(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn external_addresses_keep_supported_schemes_only() {
+        assert_eq!(
+            external_uri("HTTPS://Example.test/a?b#c").as_deref(),
+            Some("https://example.test/a?b#c")
+        );
+        assert_eq!(
+            external_uri("file:///tmp/page%20one.html").as_deref(),
+            Some("file:///tmp/page%20one.html")
+        );
+        for rejected in [
+            "javascript:alert(1)",
+            "data:text/html,hi",
+            "bitter://settings",
+            "https://",
+            "ftp://example.test/",
+            "not a uri",
+        ] {
+            assert_eq!(external_uri(rejected), None, "{rejected}");
+        }
+    }
 
     #[test]
     fn distinguishes_search_urls_hosts_and_unsupported_explicit_schemes() {

@@ -15,6 +15,7 @@ impl BitterApp {
     pub fn new() -> Self {
         let app = adw::Application::builder()
             .application_id("com.bitterbrowser.Browser")
+            .flags(gio::ApplicationFlags::HANDLES_OPEN)
             .build();
         let startup_failed = Rc::new(Cell::new(false));
 
@@ -56,6 +57,20 @@ impl BitterApp {
                 failure.set(true);
                 tracing::error!("{heading}: {detail}");
                 startup_error(app, heading, &detail);
+            }
+        });
+
+        app.connect_open(|app, files, _| {
+            app.activate();
+            let Some(window) = app.active_window() else {
+                return;
+            };
+            for file in files {
+                let uri = file.uri();
+                if let Err(error) = window.activate_action("win.open_uri", Some(&uri.to_variant()))
+                {
+                    tracing::warn!("Could not open {uri}: {error}");
+                }
             }
         });
 
