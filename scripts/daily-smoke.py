@@ -427,8 +427,9 @@ def run_flow(browser, base):
 
     _, width, _ = step(lambda: browser.enter(f"{base}/probe"), lambda r: r[1] > 0,
                        "Probe page did not report")
-    step(lambda: (browser.key("ctrl+f"), time.sleep(0.3),
-                  browser.xdotool("type", "--clearmodifiers", "--delay", "20", "ALPHA")),
+    # Slow runners need time to reveal the find bar before typing.
+    step(lambda: (browser.key("ctrl+f"), time.sleep(1.0),
+                  browser.xdotool("type", "--clearmodifiers", "--delay", "60", "ALPHA")),
          lambda r: r[0].lower() == "alpha", "Find did not select a match")
     time.sleep(0.2)
     browser.frame("find")
