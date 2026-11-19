@@ -16,7 +16,24 @@ pub struct Preferences {
     /// Ask for a destination for every download instead of saving to the
     /// download directory.
     pub ask_download_location: bool,
+    /// Underline misspelled words in text fields.
+    pub spell_check: bool,
+    /// Page zoom, in percent, for sites without a remembered level.
+    pub default_zoom: u16,
+    /// Block ads and trackers with the content filter lists.
+    pub block_ads: bool,
+    /// Load sites over HTTPS and ask before falling back to HTTP.
+    pub https_only: bool,
+    /// Refuse cookies from sites other than the one in the address bar.
+    pub block_third_party_cookies: bool,
+    /// WebKit's Intelligent Tracking Prevention.
+    pub prevent_tracking: bool,
+    /// Web Inspector and the Inspect Element menu item.
+    pub developer_tools: bool,
 }
+
+/// The zoom presets, in percent, that the browser steps through.
+pub const ZOOM_PERCENTS: [u16; 13] = [30, 50, 67, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300];
 
 impl Default for Preferences {
     fn default() -> Self {
@@ -25,6 +42,13 @@ impl Default for Preferences {
             theme: Theme::default(),
             restore_session: true,
             ask_download_location: false,
+            spell_check: true,
+            default_zoom: 100,
+            block_ads: true,
+            https_only: false,
+            block_third_party_cookies: true,
+            prevent_tracking: true,
+            developer_tools: true,
         }
     }
 }
@@ -164,10 +188,25 @@ impl ConfigStore {
         let search = ensure_table(&mut document, "general")?;
         search.insert("default_search_engine", value(preferences.search.label()));
         search.insert("restore_session", value(preferences.restore_session));
+        search.insert("spell_check", value(preferences.spell_check));
         let appearance = ensure_table(&mut document, "appearance")?;
         appearance.insert("theme", value(preferences.theme.key()));
+        appearance.insert("default_zoom", value(i64::from(preferences.default_zoom)));
         let downloads = ensure_table(&mut document, "downloads")?;
         downloads.insert("ask_location", value(preferences.ask_download_location));
+        let privacy = ensure_table(&mut document, "privacy")?;
+        privacy.insert("block_ads", value(preferences.block_ads));
+        privacy.insert("https_only", value(preferences.https_only));
+        privacy.insert(
+            "block_third_party_cookies",
+            value(preferences.block_third_party_cookies),
+        );
+        privacy.insert(
+            "prevent_cross_site_tracking",
+            value(preferences.prevent_tracking),
+        );
+        let advanced = ensure_table(&mut document, "advanced")?;
+        advanced.insert("developer_tools", value(preferences.developer_tools));
 
         let bytes = document.to_string().into_bytes();
         if bytes.len() > MAX_BYTES {
@@ -246,11 +285,42 @@ fn validate(document: &DocumentMut) -> Result<Preferences, ConfigFailure> {
     })?;
     let restore_session = read_bool(document, "general", "restore_session")?.unwrap_or(true);
     let ask_download_location = read_bool(document, "downloads", "ask_location")?.unwrap_or(false);
+    let defaults = Preferences::default();
+    let flag = |table, key, default: bool| -> Result<bool, ConfigFailure> {
+        Ok(read_bool(document, table, key)?.unwrap_or(default))
+    };
+    let default_zoom = match document
+        .get("appearance")
+        .and_then(toml_edit::Item::as_table_like)
+        .and_then(|table| table.get("default_zoom"))
+    {
+        None => defaults.default_zoom,
+        Some(item) => item
+            .as_integer()
+            .and_then(|percent| u16::try_from(percent).ok())
+            .filter(|percent| ZOOM_PERCENTS.contains(percent))
+            .ok_or(ConfigFailure::InvalidValue("appearance", "default_zoom"))?,
+    };
     Ok(Preferences {
         search,
         theme,
         restore_session,
         ask_download_location,
+        spell_check: flag("general", "spell_check", defaults.spell_check)?,
+        default_zoom,
+        block_ads: flag("privacy", "block_ads", defaults.block_ads)?,
+        https_only: flag("privacy", "https_only", defaults.https_only)?,
+        block_third_party_cookies: flag(
+            "privacy",
+            "block_third_party_cookies",
+            defaults.block_third_party_cookies,
+        )?,
+        prevent_tracking: flag(
+            "privacy",
+            "prevent_cross_site_tracking",
+            defaults.prevent_tracking,
+        )?,
+        developer_tools: flag("advanced", "developer_tools", defaults.developer_tools)?,
     })
 }
 
@@ -259,10 +329,12 @@ fn read_bool(
     table: &'static str,
     key: &'static str,
 ) -> Result<Option<bool>, ConfigFailure> {
-    document
-        .get(table)
-        .and_then(toml_edit::Item::as_table_like)
-        .and_then(|values| values.get(key))
+    let Some(item) = document.get(table) else {
+        return Ok(None);
+    };
+    item.as_table_like()
+        .ok_or(ConfigFailure::InvalidTable(table))?
+        .get(key)
         .map(|item| {
             item.as_bool()
                 .ok_or(ConfigFailure::InvalidValue(table, key))
@@ -428,6 +500,48 @@ mod tests {
         );
         std::fs::write(&path, "version = 1\n[downloads]\nask_location = \"yes\"\n").unwrap();
         assert!(ConfigStore::open(path).is_err());
+    }
+
+    #[test]
+    fn privacy_zoom_and_advanced_settings_round_trip_and_reject_bad_values() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let mut store = ConfigStore::open(path.clone()).unwrap();
+        let next = Preferences {
+            spell_check: false,
+            default_zoom: 125,
+            block_ads: false,
+            https_only: true,
+            block_third_party_cookies: false,
+            prevent_tracking: false,
+            developer_tools: false,
+            ..store.current()
+        };
+        store.save(next).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        for expected in [
+            "spell_check = false",
+            "default_zoom = 125",
+            "[privacy]",
+            "https_only = true",
+            "prevent_cross_site_tracking = false",
+            "[advanced]",
+            "developer_tools = false",
+        ] {
+            assert!(text.contains(expected), "{text}");
+        }
+        assert_eq!(ConfigStore::open(path.clone()).unwrap().current(), next);
+        for invalid in [
+            "[appearance]\ndefault_zoom = 120",
+            "[appearance]\ndefault_zoom = -100",
+            "[appearance]\ndefault_zoom = '100'",
+            "[privacy]\nhttps_only = 'yes'",
+            "[advanced]\ndeveloper_tools = 1",
+            "privacy = true",
+        ] {
+            fs::write(&path, invalid).unwrap();
+            assert!(ConfigStore::open(path.clone()).is_err(), "{invalid}");
+        }
     }
 
     #[test]

@@ -198,6 +198,34 @@ impl CommandPalette {
                 keywords: &["files", "saved", "transfer"],
             },
             Command {
+                id: "print",
+                title: "Print Page",
+                icon: "printer-symbolic",
+                shortcut: "Ctrl+P",
+                keywords: &["paper", "pdf", "save"],
+            },
+            Command {
+                id: "devtools",
+                title: "Developer Tools",
+                icon: "applications-engineering-symbolic",
+                shortcut: "F12",
+                keywords: &["inspect", "inspector", "console", "debug"],
+            },
+            Command {
+                id: "clear_data",
+                title: "Clear Browsing Data",
+                icon: "user-trash-symbolic",
+                shortcut: "Ctrl+Shift+Delete",
+                keywords: &["history", "cookies", "cache", "privacy", "delete"],
+            },
+            Command {
+                id: "site_permissions",
+                title: "Site Permissions",
+                icon: "preferences-system-privacy-symbolic",
+                shortcut: "",
+                keywords: &["camera", "microphone", "location", "notifications"],
+            },
+            Command {
                 id: "settings",
                 title: "Open Preferences",
                 icon: "emblem-system-symbolic",
@@ -252,6 +280,16 @@ impl CommandPalette {
             gtk4::glib::Propagation::Proceed
         });
         search_entry.add_controller(key_controller_entry);
+        // The entry handles Enter itself, so the key controller never sees it.
+        let list_box_clone = list_box.clone();
+        search_entry.connect_activate(move |_| {
+            let row = list_box_clone
+                .selected_row()
+                .or_else(|| list_box_clone.row_at_index(0));
+            if let Some(row) = row {
+                row.activate();
+            }
+        });
 
         Self {
             window,

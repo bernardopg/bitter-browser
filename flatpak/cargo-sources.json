@@ -1133,6 +1133,19 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
+        "url": "https://static.crates.io/crates/regex-lite/regex-lite-0.1.9.crate",
+        "sha256": "cab834c73d247e67f4fae452806d17d3c7501756d98c8808d7c9c7aa7d18f973",
+        "dest": "cargo/vendor/regex-lite-0.1.9"
+    },
+    {
+        "type": "inline",
+        "contents": "{\"package\": \"cab834c73d247e67f4fae452806d17d3c7501756d98c8808d7c9c7aa7d18f973\", \"files\": {}}",
+        "dest": "cargo/vendor/regex-lite-0.1.9",
+        "dest-filename": ".cargo-checksum.json"
+    },
+    {
+        "type": "archive",
+        "archive-type": "tar-gzip",
         "url": "https://static.crates.io/crates/rsqlite-vfs/rsqlite-vfs-0.2.0.crate",
         "sha256": "353b74f9810d5b085b6c42c9d86a5f0fdb795553235cdd48753b32e3809d18a7",
         "dest": "cargo/vendor/rsqlite-vfs-0.2.0"

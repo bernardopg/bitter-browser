@@ -8,6 +8,13 @@ arch=('x86_64')
 url='https://github.com/bernardopg/bitter-browser'
 license=('MPL-2.0')
 depends=('dconf' 'glib2' 'glibc' 'gtk4' 'hicolor-icon-theme' 'libadwaita' 'libgcc' 'libsoup3' 'pango' 'webkitgtk-6.0')
+optdepends=('gst-plugins-good: VP9, WebM and Opus video, as used by YouTube'
+            'gst-plugins-bad: Media Source Extensions demuxers and AV1 decoding'
+            'gst-libav: H.264 and AAC video'
+            'gst-plugin-va: hardware video decoding on Intel and AMD graphics'
+            'xdg-desktop-portal: camera, microphone and screen sharing'
+            'geoclue: location for sites you allow'
+            'hunspell-en_us: spell checking dictionary (install the ones for your languages)')
 makedepends=('cargo' 'meson')
 # The bundled SQLite is C; makepkg LTO turns it into GCC bitcode that the Rust linker cannot read.
 options=('!lto')

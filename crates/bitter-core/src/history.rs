@@ -123,6 +123,27 @@ impl History {
 
         Ok(results)
     }
+
+    /// Addresses last visited at or after `since` (Unix seconds).
+    pub fn urls_since(&self, since: i64) -> Result<Vec<String>> {
+        let mut statement = self
+            .conn
+            .prepare("SELECT url FROM history WHERE last_visit_time >= ?1")?;
+        let rows = statement.query_map([since], |row| row.get(0))?;
+        rows.collect()
+    }
+
+    /// Forgets pages last visited at or after `since` (Unix seconds); `None`
+    /// forgets everything. Returns how many pages were removed.
+    pub fn clear_since(&self, since: Option<i64>) -> Result<usize> {
+        let removed = match since {
+            Some(since) => self
+                .conn
+                .execute("DELETE FROM history WHERE last_visit_time >= ?1", [since])?,
+            None => self.conn.execute("DELETE FROM history", [])?,
+        };
+        Ok(removed)
+    }
 }
 
 fn history_fts_query(query: &str) -> Option<String> {
@@ -146,6 +167,34 @@ fn history_fts_query(query: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clearing_removes_recent_pages_and_their_search_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::open(dir.path()).unwrap();
+        history
+            .add_visit("https://old.test/", Some("Old page"))
+            .unwrap();
+        history
+            .add_visit("https://new.test/", Some("New page"))
+            .unwrap();
+        history
+            .conn
+            .execute(
+                "UPDATE history SET last_visit_time = 100 WHERE url = 'https://old.test/'",
+                [],
+            )
+            .unwrap();
+        assert_eq!(history.urls_since(1_000).unwrap(), ["https://new.test/"]);
+        assert_eq!(history.clear_since(Some(1_000)).unwrap(), 1);
+        assert_eq!(
+            history.recent(10).unwrap(),
+            [("https://old.test/".to_owned(), "Old page".to_owned())]
+        );
+        assert!(history.search("New").unwrap().is_empty());
+        assert_eq!(history.clear_since(None).unwrap(), 1);
+        assert!(history.recent(10).unwrap().is_empty());
+    }
 
     #[test]
     fn search_accepts_url_like_input() {

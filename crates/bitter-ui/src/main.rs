@@ -1,7 +1,9 @@
 mod app;
 mod command_palette;
+mod content_blocking;
 mod downloads;
 mod find_bar;
+mod https_only;
 mod internal_pages;
 mod preferences;
 mod session_writer;
