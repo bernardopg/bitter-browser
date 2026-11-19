@@ -11,9 +11,34 @@ import subprocess
 import tempfile
 import threading
 import time
+import struct
+import zlib
+import urllib.parse
 from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+def solid_png(size, rgb):
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+    rows = b"".join(b"\0" + bytes(rgb) * size for _ in range(size))
+    header = struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b"")
+
+
+FAVICON = solid_png(16, (232, 84, 42))
+DOWNLOAD_BODY = b"Bitter Browser download fixture\n" * 64
+PROBE_PAGE = """<style>body{margin:0;font:16px sans-serif}button{position:absolute;top:120px;left:10px}</style>
+<p>alpha beta alpha gamma alpha</p>
+<button onclick="document.documentElement.requestFullscreen()">Full screen</button>
+<script>
+let last = "";
+setInterval(() => {
+  const state = [getSelection().toString(), innerWidth, !!document.fullscreenElement].join("|");
+  if (state !== last) { last = state; fetch("/report?" + encodeURIComponent(state)).catch(() => {}); }
+}, 50);
+</script>"""
+
 
 def eventually(check, message, timeout=12):
     until = time.monotonic() + timeout
@@ -30,6 +55,18 @@ class Fixture(BaseHTTPRequestHandler):
     lock = threading.Lock()
     release_slow = threading.Event()
 
+    reports = []
+
+    @classmethod
+    def report(cls, predicate, since=0):
+        with cls.lock:
+            return next((r for r in reversed(cls.reports[since:]) if predicate(r)), None)
+
+    @classmethod
+    def mark(cls):
+        with cls.lock:
+            return len(cls.reports)
+
     @classmethod
     def count(cls, path):
         with cls.lock:
@@ -38,14 +75,42 @@ class Fixture(BaseHTTPRequestHandler):
     def do_GET(self):
         with self.lock:
             self.paths[self.path] += 1
+        if self.path.startswith("/report?"):
+            selection, width, fullscreen = urllib.parse.unquote(self.path[8:]).split("|")
+            with self.lock:
+                self.reports.append((selection, int(width), fullscreen == "true"))
+            self.send_response(204)
+            self.end_headers()
+            return
         if self.path == "/redirect":
             self.send_response(302)
             self.send_header("Location", "/landing")
             self.end_headers()
             return
+        if self.path == "/favicon.ico":
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(FAVICON)))
+            self.end_headers()
+            self.wfile.write(FAVICON)
+            return
+        if self.path in ("/download", "/archive.zip"):
+            body = DOWNLOAD_BODY
+            self.send_response(200)
+            if self.path == "/download":
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Disposition", 'attachment; filename="../../report:final.txt"')
+            else:
+                self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path == "/slow":
             self.release_slow.wait(10)
-        if self.path == "/home":
+        if self.path == "/probe":
+            body = PROBE_PAGE
+        elif self.path == "/home":
             body = """<a href="/background" style="position:absolute; top:10px; left:10px">Open in background</a>
 <a href="/target" target="_blank" style="position:absolute; top:60px; left:10px">Open in a new tab</a>"""
         else:
@@ -84,9 +149,17 @@ class Browser:
             "GDK_BACKEND": "x11",
             "GSK_RENDERER": "cairo",
             "GTK_A11Y": "none",
+            "GSETTINGS_BACKEND": "keyfile",
+            "GSETTINGS_SCHEMA_DIR": str(directory / "schemas"),
         }
+        (directory / "schemas").mkdir()
+        subprocess.run(["glib-compile-schemas", "--targetdir", self.env["GSETTINGS_SCHEMA_DIR"],
+                        str(Path(__file__).resolve().parent.parent / "crates/bitter-ui/data")],
+                       check=True)
         for key in ("HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR"):
             Path(self.env[key]).mkdir(mode=0o700)
+        self.downloads = directory / "home" / "Fetched"
+        (directory / "config" / "user-dirs.dirs").write_text('XDG_DOWNLOAD_DIR="$HOME/Fetched"\n')
 
     def xdotool(self, *args):
         return subprocess.check_output(["xdotool", *args], text=True).strip()
@@ -110,6 +183,11 @@ class Browser:
         self.xdotool("windowmove", self.window, "60", "60")
         self.xdotool("windowfocus", "--sync", self.window)
         return elapsed
+
+    def size(self):
+        geometry = dict(line.split("=", 1) for line in self.xdotool(
+            "getwindowgeometry", "--shell", self.window).splitlines())
+        return int(geometry["WIDTH"]), int(geometry["HEIGHT"])
 
     def key(self, *keys):
         self.xdotool("key", "--clearmodifiers", *keys)
@@ -189,9 +267,15 @@ def run_flow(browser, base):
             return saved and tab_paths(saved, workspace)[index:index + 1] == [uri]
         return eventually(check, f"Selected address did not become {uri}")
 
+    version = subprocess.run([browser.binary, "--version"], env=browser.env, capture_output=True,
+                             text=True, timeout=10)
+    assert version.returncode == 0 and re.fullmatch(r"Bitter Browser \d+\.\d+\.\d+\n", version.stdout), version
+    usage = subprocess.run([browser.binary, "--help"], env=browser.env, capture_output=True, text=True, timeout=10)
+    assert usage.returncode == 0 and "[URL…]" in usage.stdout and "--version" in usage.stdout, usage
     startup = browser.start()
     browser.enter(f"{base}/first")
     eventually(lambda: browser.matching_history(f"{base}/first", "First"), "First page was not ready")
+    expect("/favicon.ico")
     browser.enter(f"{base}/redirect")
     expect("/landing")
     eventually(lambda: browser.matching_history(f"{base}/landing", "Landing"), "Redirected title was not saved")
@@ -315,8 +399,72 @@ def run_flow(browser, base):
     expect("/external")
     eventually(lambda: tab_paths(browser.current(), 0)[-1] == f"{base}/external",
                "Address from another application did not open in the running window")
+
+    def downloaded(*names):
+        def check():
+            files = sorted(path.name for path in browser.downloads.glob("*"))
+            return files == sorted(names) and all(
+                (browser.downloads / name).read_bytes() == DOWNLOAD_BODY for name in names)
+        return eventually(check, f"Downloads did not become {names}")
+
+    browser.enter(f"{base}/download")
+    downloaded("report_final.txt")
+    browser.enter(f"{base}/download")
+    downloaded("report_final.txt", "report_final (1).txt")
+    browser.enter(f"{base}/archive.zip")
+    downloaded("report_final.txt", "report_final (1).txt", "archive.zip")
+    time.sleep(0.3)
+    browser.frame("downloads")
+    assert tab_paths(browser.current(), 0)[-1] == f"{base}/external", "A download replaced the page"
+
+    def step(action, predicate, message):
+        since = Fixture.mark()
+        action()
+        return eventually(lambda: Fixture.report(predicate, since), message)
+
+    def keys(*names):
+        return lambda: [browser.key(name) for name in names]
+
+    _, width, _ = step(lambda: browser.enter(f"{base}/probe"), lambda r: r[1] > 0,
+                       "Probe page did not report")
+    step(lambda: (browser.key("ctrl+f"), time.sleep(0.3),
+                  browser.xdotool("type", "--clearmodifiers", "--delay", "20", "ALPHA")),
+         lambda r: r[0].lower() == "alpha", "Find did not select a match")
+    time.sleep(0.2)
+    browser.frame("find")
+    browser.key("Escape")
+    step(keys("ctrl+plus", "ctrl+plus"), lambda r: r[1] < width * 0.85,
+         "Zoom in did not enlarge the page")
+    step(keys("ctrl+0"), lambda r: r[1] == width, "Zoom reset did not restore the page")
+    step(keys("F11"), lambda r: r[1] > width + 150, "Full screen did not hide the browser chrome")
+    step(keys("Escape"), lambda r: r[1] == width, "Leaving full screen did not restore the chrome")
+    step(lambda: browser.click(270, 187), lambda r: r[2], "The page could not enter full screen")
+    step(keys("Escape"), lambda r: not r[2] and r[1] == width, "The page did not leave full screen")
     browser.stop()
     return {"startup_ms": round(startup * 1000), "restore_ms": round(restart * 1000)}
+
+
+def window_geometry(binary, directory):
+    browser = Browser(binary, directory, None)
+    keyfile = directory / "config" / "glib-2.0" / "settings" / "keyfile"
+    try:
+        browser.start()
+        default = browser.size()
+        browser.xdotool("windowsize", browser.window, "980", "690")
+        eventually(lambda: browser.size() == (980, 690), "The window did not resize")
+        time.sleep(0.3)
+        browser.stop()
+        saved = keyfile.read_text()
+        assert "is-maximized=false" in saved, saved
+        width = int(re.search(r"window-width=(\d+)", saved)[1])
+        height = int(re.search(r"window-height=(\d+)", saved)[1])
+        assert abs(width - 980) <= 40 and abs(height - 690) <= 40, saved
+        browser.start()
+        restored = browser.size()
+        assert restored != default and abs(restored[0] - 980) <= 40, (default, restored)
+    finally:
+        browser.stop()
+    return {"default_size": default, "restored_size": restored}
 
 
 def benchmark(binary, directory, base, samples):
@@ -366,6 +514,7 @@ def main():
         browser = Browser(args.binary, directory / "flow", args.screenshots)
         try:
             print(json.dumps(run_flow(browser, base)), flush=True)
+            print(json.dumps(window_geometry(args.binary, directory / "geometry")), flush=True)
             if args.benchmark_samples:
                 print(json.dumps(benchmark(args.binary, directory, base, args.benchmark_samples), indent=2))
             assert "panicked" not in browser.log.read_text(), browser.log.read_text()

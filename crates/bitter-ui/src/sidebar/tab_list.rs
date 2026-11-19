@@ -81,6 +81,12 @@ impl TabList {
         }
     }
 
+    pub fn set_favicon(&self, id: &str, favicon: Option<&gtk4::gdk::Texture>) {
+        if let Some(item) = self.items.borrow().get(id) {
+            item.set_favicon(favicon);
+        }
+    }
+
     pub fn connect_selected(&self, callback: impl Fn(&str) + 'static) {
         let callback = Rc::new(callback);
         for list in &self.lists {

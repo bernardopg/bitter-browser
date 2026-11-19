@@ -1,4 +1,6 @@
 use crate::command_palette::CommandPalette;
+use crate::downloads::Downloads;
+use crate::find_bar::FindBar;
 use crate::preferences::{self, PreferenceState};
 use crate::session_writer::SessionWriter;
 use crate::sidebar::Sidebar;
@@ -19,6 +21,7 @@ use std::time::Duration;
 use webkit6::prelude::*;
 
 mod suggestions;
+mod window_state;
 
 const MAX_CLOSED_TABS: usize = 20;
 
@@ -45,6 +48,11 @@ struct Browser {
     sidebar: Sidebar,
     palette: CommandPalette,
     feedback: adw::ToastOverlay,
+    downloads: Rc<Downloads>,
+    find: Rc<FindBar>,
+    fullscreen: Cell<bool>,
+    page_fullscreen: Cell<bool>,
+    zoom_toast: RefCell<Option<adw::Toast>>,
     history: History,
     bookmarks: Bookmarks,
     preferences: PreferenceState,
@@ -76,11 +84,14 @@ impl BitterWindow {
         // Builder `css_classes` would replace the window's default `background`
         // class, leaving the content area unpainted and text colors unset.
         window.add_css_class("browser-chrome");
+        let window_state = window_state::load(&window);
         let sidebar = Sidebar::new();
         let toolbar = Toolbar::new();
         let stack = gtk4::Stack::builder().hexpand(true).vexpand(true).build();
+        let find = FindBar::new();
         let content = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
         content.append(toolbar.widget());
+        content.append(find.widget());
         content.append(&stack);
         let main = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
         main.append(sidebar.widget());
@@ -126,6 +137,16 @@ impl BitterWindow {
                 }
             }
         }
+        let network = webkit6::NetworkSession::new(
+            Some(profile.web_data_dir()),
+            Some(profile.web_cache_dir()),
+        );
+        if let Some(data) = network.website_data_manager() {
+            data.set_favicons_enabled(true);
+        }
+        let downloads = Downloads::new(&feedback);
+        downloads.attach(&network);
+        toolbar.pack_end(downloads.widget());
         let browser = Rc::new(Browser {
             window: window.downgrade(),
             palette: CommandPalette::new(&window),
@@ -133,13 +154,15 @@ impl BitterWindow {
             toolbar,
             sidebar,
             feedback,
+            downloads,
+            find,
+            fullscreen: Cell::new(false),
+            page_fullscreen: Cell::new(false),
+            zoom_toast: Default::default(),
             history,
             bookmarks,
             preferences: config,
-            network: webkit6::NetworkSession::new(
-                Some(profile.web_data_dir()),
-                Some(profile.web_cache_dir()),
-            ),
+            network,
             workspaces: Default::default(),
             workspace: Cell::new(restored.workspace),
             selecting: Cell::new(false),
@@ -161,7 +184,10 @@ impl BitterWindow {
         browser.show_workspace(restored.workspace);
         {
             let browser = browser.clone();
-            window.connect_close_request(move |_| {
+            window.connect_close_request(move |window| {
+                if let Some(settings) = &window_state {
+                    window_state::save(window, settings);
+                }
                 browser.save_snapshot();
                 if let Some(mut writer) = browser.writer.borrow_mut().take() {
                     writer.finish();
@@ -222,6 +248,17 @@ impl Browser {
             ("history", &["<Control>h"]),
             ("bookmarks", &["<Control>b"]),
             ("bookmark_page", &["<Control>d"]),
+            ("downloads", &["<Control>j"]),
+            ("find", &["<Control>f"]),
+            ("find_next", &["<Control>g"]),
+            ("find_previous", &["<Control><Shift>g"]),
+            (
+                "zoom_in",
+                &["<Control>plus", "<Control>equal", "<Control>KP_Add"],
+            ),
+            ("zoom_out", &["<Control>minus", "<Control>KP_Subtract"]),
+            ("zoom_reset", &["<Control>0", "<Control>KP_0"]),
+            ("fullscreen", &["F11"]),
             ("preferences", &["<Control>comma"]),
         ] {
             let action = gio::SimpleAction::new(id, None);
@@ -266,6 +303,32 @@ impl Browser {
             glib::Propagation::Proceed
         });
         window.add_controller(keys);
+        // The web view consumes Escape, so leave browser full screen before it
+        // sees the key. Page-requested full screen is left to WebKit.
+        let escape = gtk4::EventControllerKey::new();
+        escape.set_propagation_phase(gtk4::PropagationPhase::Capture);
+        let weak = Rc::downgrade(self);
+        escape.connect_key_pressed(move |_, key, _, _| {
+            if key == gtk4::gdk::Key::Escape
+                && let Some(browser) = weak.upgrade()
+                && browser.fullscreen.get()
+                && !browser.page_fullscreen.get()
+                && !browser.find.is_open()
+            {
+                browser.set_fullscreen(false);
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+        window.add_controller(escape);
+        let weak = Rc::downgrade(self);
+        window.connect_fullscreened_notify(move |window| {
+            if let Some(browser) = weak.upgrade()
+                && !window.is_fullscreen()
+            {
+                browser.set_fullscreen(false);
+            }
+        });
         suggestions::connect(self);
 
         if self.writer.borrow().is_some() {
@@ -327,6 +390,26 @@ impl Browser {
             "bookmarks" => self.navigate_active("bitter://bookmarks"),
             "bookmark_page" => self.toggle_bookmark(),
             "settings" | "preferences" => self.show_preferences(),
+            "downloads" => self.downloads.show(),
+            "find" => {
+                if let Some(tab) = self.active() {
+                    let view = self.materialize(&tab);
+                    if let Some(controller) = view.web.find_controller() {
+                        self.find.open(controller);
+                    }
+                }
+            }
+            "find_next" | "find_previous" => {
+                if self.find.is_open() {
+                    self.find.step(command == "find_next");
+                } else {
+                    self.command("find");
+                }
+            }
+            "zoom_in" => self.zoom(Some(true)),
+            "zoom_out" => self.zoom(Some(false)),
+            "zoom_reset" => self.zoom(None),
+            "fullscreen" => self.set_fullscreen(!self.fullscreen.get()),
             "copy_url" => {
                 if let (Some(display), Some(tab)) = (gtk4::gdk::Display::default(), self.active()) {
                     display.clipboard().set_text(&tab.uri());
@@ -374,7 +457,38 @@ impl Browser {
                     browser.close(id);
                 }
             });
+        if tab.view.get().is_none() {
+            self.load_saved_favicon(&tab);
+        }
         index
+    }
+
+    /// Shows the stored icon of a tab whose page has not been loaded yet.
+    fn load_saved_favicon(self: &Rc<Self>, tab: &Rc<Tab>) {
+        let uri = tab.uri();
+        if !is_recordable_uri(&uri) {
+            return;
+        }
+        let Some(database) = self
+            .network
+            .website_data_manager()
+            .and_then(|data| data.favicon_database())
+        else {
+            return;
+        };
+        let weak = Rc::downgrade(self);
+        let weak_tab = Rc::downgrade(tab);
+        database.favicon(&uri, gio::Cancellable::NONE, move |result| {
+            if let Ok(texture) = result
+                && let Some((browser, tab)) = upgrade(&weak, &weak_tab)
+                && tab.view.get().is_none()
+            {
+                browser
+                    .sidebar
+                    .tab_list()
+                    .set_favicon(&tab.id, Some(&texture));
+            }
+        });
     }
 
     fn new_tab(self: &Rc<Self>, workspace: WorkspaceId, uri: &str, foreground: bool) -> bool {
@@ -425,6 +539,7 @@ impl Browser {
             group.selected = index;
             tab
         };
+        self.find.close();
         self.workspace.set(workspace);
         self.selecting.set(true);
         self.sidebar.workspace().show(workspace);
@@ -553,6 +668,47 @@ impl Browser {
 
     fn toast(&self, message: &str) {
         self.feedback.add_toast(adw::Toast::new(message));
+    }
+
+    /// Steps the active tab's zoom, or resets it when `zoom_in` is `None`.
+    fn zoom(&self, zoom_in: Option<bool>) {
+        self.with_view(|_, view| {
+            let level = match zoom_in {
+                Some(zoom_in) => next_zoom(view.web.zoom_level(), zoom_in),
+                None => 1.0,
+            };
+            view.web.set_zoom_level(level);
+            let toast = adw::Toast::builder()
+                .title(format!("Zoom {:.0}%", level * 100.0))
+                .timeout(2)
+                .build();
+            if let Some(previous) = self.zoom_toast.replace(Some(toast.clone())) {
+                previous.dismiss();
+            }
+            self.feedback.add_toast(toast);
+        });
+    }
+
+    /// Fullscreen hides the browser chrome so the page fills the screen.
+    fn set_fullscreen(&self, fullscreen: bool) {
+        if self.fullscreen.replace(fullscreen) == fullscreen {
+            return;
+        }
+        self.sidebar.widget().set_visible(!fullscreen);
+        self.toolbar.widget().set_visible(!fullscreen);
+        if let Some(window) = self.window.upgrade() {
+            if fullscreen {
+                window.fullscreen();
+            } else {
+                window.unfullscreen();
+            }
+        }
+        if fullscreen {
+            self.find.close();
+            if !self.page_fullscreen.get() {
+                self.toast("Press F11 or Esc to exit full screen");
+            }
+        }
     }
 
     fn focus_address(&self) {
@@ -843,8 +999,39 @@ impl Browser {
 
         let weak = Rc::downgrade(self);
         let weak_tab = Rc::downgrade(tab);
+        view.web.connect_favicon_notify(move |web| {
+            if let Some((browser, tab)) = upgrade(&weak, &weak_tab) {
+                browser
+                    .sidebar
+                    .tab_list()
+                    .set_favicon(&tab.id, web.favicon().as_ref());
+            }
+        });
+
+        let weak = Rc::downgrade(self);
+        view.web.connect_enter_fullscreen(move |_| {
+            if let Some(browser) = weak.upgrade() {
+                browser.page_fullscreen.set(true);
+                browser.set_fullscreen(true);
+            }
+            false
+        });
+        let weak = Rc::downgrade(self);
+        view.web.connect_leave_fullscreen(move |_| {
+            if let Some(browser) = weak.upgrade() {
+                browser.page_fullscreen.set(false);
+                browser.set_fullscreen(false);
+            }
+            false
+        });
+
+        let weak = Rc::downgrade(self);
+        let weak_tab = Rc::downgrade(tab);
         view.web.connect_decide_policy(move |_, decision, kind| {
             use webkit6::PolicyDecisionType::*;
+            if kind == Response {
+                return decide_response(decision);
+            }
             if !matches!(kind, NavigationAction | NewWindowAction) {
                 return false;
             }
@@ -994,6 +1181,52 @@ fn is_recordable_uri(uri: &str) -> bool {
 enum Target {
     Address(String),
     Search(String),
+}
+
+const ZOOM_LEVELS: [f64; 13] = [
+    0.3, 0.5, 0.67, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0,
+];
+
+/// Returns the next preset zoom level above or below `current`.
+fn next_zoom(current: f64, zoom_in: bool) -> f64 {
+    const EPSILON: f64 = 0.001;
+    if zoom_in {
+        ZOOM_LEVELS
+            .into_iter()
+            .find(|level| *level > current + EPSILON)
+            .unwrap_or(ZOOM_LEVELS[ZOOM_LEVELS.len() - 1])
+    } else {
+        ZOOM_LEVELS
+            .into_iter()
+            .rev()
+            .find(|level| *level < current - EPSILON)
+            .unwrap_or(ZOOM_LEVELS[0])
+    }
+}
+
+/// Downloads main-frame responses the engine cannot display and those the
+/// server marks as attachments. Other responses keep WebKit's default.
+fn decide_response(decision: &webkit6::PolicyDecision) -> bool {
+    let Some(policy) = decision.downcast_ref::<webkit6::ResponsePolicyDecision>() else {
+        return false;
+    };
+    if !policy.is_main_frame_main_resource() {
+        return false;
+    }
+    let attachment = policy
+        .response()
+        .and_then(|response| response.http_headers())
+        .and_then(|headers| headers.content_disposition())
+        .is_some_and(|(disposition, _)| is_attachment(&disposition));
+    if attachment || !policy.is_mime_type_supported() {
+        decision.download();
+        return true;
+    }
+    false
+}
+
+fn is_attachment(disposition: &str) -> bool {
+    disposition.trim().eq_ignore_ascii_case("attachment")
 }
 
 /// Accepts addresses handed over by the desktop, such as links opened from
@@ -1244,6 +1477,25 @@ fn escape_html(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zoom_steps_through_presets_and_stops_at_the_limits() {
+        assert_eq!(next_zoom(1.0, true), 1.1);
+        assert_eq!(next_zoom(1.0, false), 0.9);
+        assert_eq!(next_zoom(1.17, true), 1.25);
+        assert_eq!(next_zoom(1.17, false), 1.1);
+        assert_eq!(next_zoom(3.0, true), 3.0);
+        assert_eq!(next_zoom(0.3, false), 0.3);
+        assert_eq!(next_zoom(5.0, false), 3.0);
+    }
+
+    #[test]
+    fn only_attachment_dispositions_force_downloads() {
+        assert!(is_attachment("attachment"));
+        assert!(is_attachment(" Attachment "));
+        assert!(!is_attachment("inline"));
+        assert!(!is_attachment(""));
+    }
 
     #[test]
     fn external_addresses_keep_supported_schemes_only() {
