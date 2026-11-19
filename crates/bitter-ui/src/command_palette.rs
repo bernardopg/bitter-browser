@@ -43,7 +43,7 @@ impl CommandPalette {
             .build();
 
         let search_entry = gtk4::SearchEntry::builder()
-            .placeholder_text("Search commands, tabs, history...")
+            .placeholder_text("Search browser commands")
             .hexpand(true)
             .build();
 
@@ -77,6 +77,27 @@ impl CommandPalette {
                 icon: "window-close-symbolic",
                 shortcut: "Ctrl+W",
                 keywords: &["remove", "tab"],
+            },
+            Command {
+                id: "reopen_tab",
+                title: "Reopen Closed Tab",
+                icon: "edit-undo-symbolic",
+                shortcut: "Ctrl+Shift+T",
+                keywords: &["restore", "closed"],
+            },
+            Command {
+                id: "move_left",
+                title: "Move Tab Earlier",
+                icon: "go-up-symbolic",
+                shortcut: "Alt+Shift+Left",
+                keywords: &["reorder", "left", "previous"],
+            },
+            Command {
+                id: "move_right",
+                title: "Move Tab Later",
+                icon: "go-down-symbolic",
+                shortcut: "Alt+Shift+Right",
+                keywords: &["reorder", "right", "next"],
             },
             Command {
                 id: "focus_omnibar",
@@ -136,10 +157,10 @@ impl CommandPalette {
             },
             Command {
                 id: "settings",
-                title: "Open Settings",
+                title: "Open Preferences",
                 icon: "emblem-system-symbolic",
-                shortcut: "",
-                keywords: &["preferences", "config"],
+                shortcut: "Ctrl+,",
+                keywords: &["settings", "config"],
             },
         ]);
 
@@ -147,10 +168,12 @@ impl CommandPalette {
         rebuild_command_rows(&list_box, &commands, &visible_commands, "");
 
         let key_controller = gtk4::EventControllerKey::new();
-        let window_clone = window.clone();
+        let window_clone = window.downgrade();
         key_controller.connect_key_pressed(move |_, keyval, _, _| {
-            if keyval == gtk4::gdk::Key::Escape {
-                window_clone.set_visible(false);
+            if keyval == gtk4::gdk::Key::Escape
+                && let Some(window) = window_clone.upgrade()
+            {
+                window.set_visible(false);
                 return gtk4::glib::Propagation::Stop;
             }
             gtk4::glib::Propagation::Proceed
@@ -177,11 +200,11 @@ impl CommandPalette {
                 return gtk4::glib::Propagation::Proceed;
             }
 
-            if keyval == gtk4::gdk::Key::Return || keyval == gtk4::gdk::Key::KP_Enter {
-                if let Some(row) = list_box_clone.selected_row() {
-                    row.activate();
-                    return gtk4::glib::Propagation::Stop;
-                }
+            if (keyval == gtk4::gdk::Key::Return || keyval == gtk4::gdk::Key::KP_Enter)
+                && let Some(row) = list_box_clone.selected_row()
+            {
+                row.activate();
+                return gtk4::glib::Propagation::Stop;
             }
 
             gtk4::glib::Propagation::Proceed
@@ -206,12 +229,18 @@ impl CommandPalette {
 
     pub fn connect_command_activated<F: Fn(&str) + 'static>(&self, f: F) {
         let visible_commands = self.visible_commands.clone();
-        let window = self.window.clone();
+        let window = self.window.downgrade();
         self.list_box.connect_row_activated(move |_, row| {
             let index = row.index() as usize;
-            if let Some(cmd) = visible_commands.borrow().get(index) {
-                f(cmd.id);
-                window.set_visible(false);
+            let id = visible_commands
+                .borrow()
+                .get(index)
+                .map(|command| command.id);
+            if let Some(id) = id {
+                if let Some(window) = window.upgrade() {
+                    window.set_visible(false);
+                }
+                f(id);
             }
         });
     }

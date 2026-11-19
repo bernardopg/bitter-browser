@@ -3,6 +3,7 @@ pub mod tab_list;
 pub mod workspace;
 
 use gtk4::prelude::*;
+use libadwaita as adw;
 
 pub struct Sidebar {
     container: gtk4::Box,
@@ -16,6 +17,7 @@ impl Sidebar {
         let container = gtk4::Box::builder()
             .orientation(gtk4::Orientation::Vertical)
             .width_request(220)
+            .hexpand(false)
             .css_classes(vec!["sidebar"])
             .build();
 
@@ -23,8 +25,13 @@ impl Sidebar {
         let tab_list = tab_list::TabList::new();
 
         let new_tab_button = gtk4::Button::builder()
-            .label("New Tab")
-            .icon_name("tab-new-symbolic")
+            .tooltip_text("New Tab (Ctrl+T)")
+            .child(
+                &adw::ButtonContent::builder()
+                    .label("New Tab")
+                    .icon_name("tab-new-symbolic")
+                    .build(),
+            )
             .margin_start(8)
             .margin_end(8)
             .margin_top(8)

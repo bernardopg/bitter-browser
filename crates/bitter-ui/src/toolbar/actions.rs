@@ -1,59 +1,58 @@
 use gtk4::prelude::*;
 
 pub struct Actions {
-    box_container: gtk4::Box,
-    back_button: gtk4::Button,
-    forward_button: gtk4::Button,
-    reload_button: gtk4::Button,
+    container: gtk4::Box,
+    back: gtk4::Button,
+    forward: gtk4::Button,
+    reload: gtk4::Button,
 }
 
 impl Actions {
     pub fn new() -> Self {
-        let box_container = gtk4::Box::builder()
-            .orientation(gtk4::Orientation::Horizontal)
-            .spacing(4)
-            .build();
-
-        let back_button = gtk4::Button::builder()
-            .icon_name("go-previous-symbolic")
-            .tooltip_text("Back")
-            .build();
-
-        let forward_button = gtk4::Button::builder()
-            .icon_name("go-next-symbolic")
-            .tooltip_text("Forward")
-            .build();
-
-        let reload_button = gtk4::Button::builder()
-            .icon_name("view-refresh-symbolic")
-            .tooltip_text("Reload")
-            .build();
-
-        box_container.append(&back_button);
-        box_container.append(&forward_button);
-        box_container.append(&reload_button);
-
+        let container = gtk4::Box::builder().spacing(4).build();
+        let back = button("go-previous-symbolic", "Back (Alt+Left)", "win.back");
+        let forward = button("go-next-symbolic", "Forward (Alt+Right)", "win.forward");
+        let reload = button("view-refresh-symbolic", "Reload (Ctrl+R)", "win.reload");
+        for button in [&back, &forward, &reload] {
+            container.append(button);
+        }
         Self {
-            box_container,
-            back_button,
-            forward_button,
-            reload_button,
+            container,
+            back,
+            forward,
+            reload,
         }
     }
 
     pub fn widget(&self) -> &gtk4::Widget {
-        self.box_container.upcast_ref()
+        self.container.upcast_ref()
     }
 
-    pub fn connect_back_clicked<F: Fn() + 'static>(&self, f: F) {
-        self.back_button.connect_clicked(move |_| f());
+    pub fn refresh(&self, back: bool, forward: bool, loading: bool) {
+        self.back.set_sensitive(back);
+        self.forward.set_sensitive(forward);
+        self.reload.set_icon_name(if loading {
+            "process-stop-symbolic"
+        } else {
+            "view-refresh-symbolic"
+        });
+        let label = if loading {
+            "Stop loading (Escape)"
+        } else {
+            "Reload (Ctrl+R)"
+        };
+        self.reload.set_tooltip_text(Some(label));
+        self.reload
+            .update_property(&[gtk4::accessible::Property::Label(label)]);
     }
+}
 
-    pub fn connect_forward_clicked<F: Fn() + 'static>(&self, f: F) {
-        self.forward_button.connect_clicked(move |_| f());
-    }
-
-    pub fn connect_reload_clicked<F: Fn() + 'static>(&self, f: F) {
-        self.reload_button.connect_clicked(move |_| f());
-    }
+fn button(icon: &str, title: &str, action: &str) -> gtk4::Button {
+    let button = gtk4::Button::builder()
+        .icon_name(icon)
+        .tooltip_text(title)
+        .action_name(action)
+        .build();
+    button.update_property(&[gtk4::accessible::Property::Label(title)]);
+    button
 }

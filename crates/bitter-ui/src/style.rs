@@ -1,64 +1,55 @@
 const APP_CSS: &str = r#"
-window {
-  background: #0d0d0d;
-  color: #f0f0f0;
+.navigation-progress trough,
+.navigation-progress progress {
+  min-height: 2px;
+  border: none;
+  border-radius: 0;
 }
 
-.sidebar {
-  background: #141414;
-  border-right: 1px solid #2a2a2a;
+.workspace-switcher button {
+  min-height: 30px;
+}
+
+.browser-chrome .sidebar {
+  background-color: @sidebar_bg_color;
+  border-right: 1px solid @sidebar_border_color;
 }
 
 .tab-list {
-  background: transparent;
+  background-color: transparent;
 }
 
 .tab-item {
   min-height: 36px;
-  border-radius: 6px;
+  border-radius: 8px;
   margin: 2px 8px;
 }
 
 .tab-item:selected {
-  background: #1a1a1a;
-  box-shadow: inset 3px 0 #ff4d00;
-}
-
-.tab-item label {
-  font-size: 13px;
-}
-
-button {
-  border-radius: 6px;
-}
-
-button:hover {
-  background: #1a1a1a;
+  background-color: alpha(@accent_color, 0.14);
+  box-shadow: inset 3px 0 @accent_color;
 }
 
 .omnibar {
   min-height: 34px;
   border-radius: 8px;
-  border: 1px solid #2a2a2a;
-  background: #141414;
-  color: #f0f0f0;
+  border: 1px solid @borders;
+  background-color: @view_bg_color;
+  color: @view_fg_color;
   padding: 0 12px;
 }
 
-.omnibar:focus {
-  border-color: #ff4d00;
-  box-shadow: 0 0 0 1px rgba(255, 77, 0, 0.35);
+.omnibar:focus-within {
+  border-color: @accent_color;
+  box-shadow: 0 0 0 1px alpha(@accent_color, 0.35);
 }
 
 .omnibar-suggestions {
   padding: 6px;
-  border-radius: 8px;
-  background: #141414;
-  border: 1px solid #2a2a2a;
 }
 
 .omnibar-suggestions list {
-  background: transparent;
+  background-color: transparent;
 }
 
 .omnibar-suggestions row {
@@ -67,46 +58,24 @@ button:hover {
   margin: 1px 0;
 }
 
-.omnibar-suggestions row:selected {
-  background: #26211f;
-}
-
-.omnibar-suggestion-title {
-  font-size: 13px;
-  color: #f0f0f0;
-}
-
 .omnibar-suggestion-detail {
-  font-size: 12px;
-  color: #888888;
+  font-size: 0.9em;
+  opacity: 0.78;
 }
 
 .command-palette {
-  background: #1a1a1a;
-  border-radius: 8px;
-  border: 1px solid #2a2a2a;
+  background-color: @window_bg_color;
+  color: @window_fg_color;
+  border-radius: 12px;
+  border: 1px solid @borders;
 }
 
 .command-palette searchentry {
   min-height: 40px;
-  border-radius: 8px;
-  border: 1px solid #2a2a2a;
-  background: #141414;
-  color: #f0f0f0;
 }
 
-.boxed-list {
-  background: #141414;
-  border-radius: 8px;
-}
-
-.boxed-list row {
+.command-palette .boxed-list row {
   min-height: 42px;
-}
-
-.boxed-list row:selected {
-  background: #26211f;
-  color: #f0f0f0;
 }
 "#;
 

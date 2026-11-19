@@ -1,67 +1,52 @@
+use bitter_core::session::WorkspaceId;
 use gtk4::prelude::*;
 use std::rc::Rc;
 
 pub struct Workspace {
     container: gtk4::Box,
-    workspace_1: gtk4::Button,
-    workspace_2: gtk4::Button,
+    buttons: [gtk4::ToggleButton; 2],
 }
 
 impl Workspace {
     pub fn new() -> Self {
         let container = gtk4::Box::builder()
             .orientation(gtk4::Orientation::Horizontal)
-            .spacing(4)
-            .margin_start(8)
-            .margin_end(8)
-            .margin_top(8)
-            .margin_bottom(8)
+            .margin_start(12)
+            .margin_end(12)
+            .margin_top(10)
+            .margin_bottom(10)
+            .css_classes(["linked", "workspace-switcher"])
             .build();
-
-        let workspace_1 = gtk4::Button::builder()
-            .icon_name("folder-symbolic")
-            .css_classes(vec!["flat", "circular"])
-            .tooltip_text("Workspace 1")
-            .build();
-
-        let workspace_2 = gtk4::Button::builder()
-            .icon_name("folder-symbolic")
-            .css_classes(vec!["flat", "circular"])
-            .tooltip_text("Workspace 2")
-            .build();
-
-        let add_workspace = gtk4::Button::builder()
-            .icon_name("list-add-symbolic")
-            .css_classes(vec!["flat", "circular"])
-            .tooltip_text("New Workspace")
-            .build();
-
-        container.append(&workspace_1);
-        container.append(&workspace_2);
-        container.append(&add_workspace);
-
-        Self {
-            container,
-            workspace_1,
-            workspace_2,
-        }
+        let buttons = ["Main", "Second"].map(|label| {
+            let button = gtk4::ToggleButton::builder()
+                .label(label)
+                .hexpand(true)
+                .build();
+            container.append(&button);
+            button
+        });
+        buttons[1].set_group(Some(&buttons[0]));
+        buttons[0].set_active(true);
+        Self { container, buttons }
     }
 
     pub fn widget(&self) -> &gtk4::Widget {
         self.container.upcast_ref()
     }
 
-    pub fn connect_workspace_selected<F: Fn(&str) + 'static>(&self, f: F) {
-        let f = Rc::new(f);
+    pub fn show(&self, id: WorkspaceId) {
+        self.buttons[id.index()].set_active(true);
+    }
 
-        let f1 = f.clone();
-        self.workspace_1.connect_clicked(move |_| {
-            f1("default");
-        });
-
-        let f2 = f.clone();
-        self.workspace_2.connect_clicked(move |_| {
-            f2("workspace_2");
-        });
+    pub fn connect_selected(&self, callback: impl Fn(WorkspaceId) + 'static) {
+        let callback = Rc::new(callback);
+        for workspace in WorkspaceId::ALL {
+            let callback = callback.clone();
+            self.buttons[workspace.index()].connect_toggled(move |button| {
+                if button.is_active() {
+                    callback(workspace);
+                }
+            });
+        }
     }
 }

@@ -14,6 +14,17 @@ flatpak run com.bitterbrowser.Browser
 
 Check the checksum published alongside the bundle. The version in the filename changes with each release. Flatpak builds require GNOME SDK 51 and the matching Freedesktop Rust SDK extension.
 
+## Preferences and local data
+
+Open Preferences from the toolbar, with **Ctrl+,**, or from the command
+palette. Choose the address bar search provider and the browser color scheme.
+Changes save immediately. New tabs open a local start page.
+
+- [Profiles and local data](docs/profile.md) covers migration, session restore
+  and recovery.
+- [Daily browsing](docs/daily-browsing.md) lists shortcuts and explains how to
+  reproduce the WebKit smoke test.
+
 ## Develop
 
 Install stable Rust with rustfmt and Clippy, GTK >= 4.14, libadwaita >= 1.6, WebKitGTK 6 >= 2.44, and their development headers. Meson and Ninja are needed for installation.

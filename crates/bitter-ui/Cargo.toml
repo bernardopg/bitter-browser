@@ -18,3 +18,7 @@ bitter-net = { path = "../bitter-net" }
 bitter-adblock = { path = "../bitter-adblock" }
 bitter-devtools = { path = "../bitter-devtools" }
 uuid = { version = "1.8", features = ["v4"] }
+futures-channel = "0.3"
+
+[dev-dependencies]
+tempfile = "3"
