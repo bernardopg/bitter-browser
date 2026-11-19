@@ -258,7 +258,8 @@ impl Browser {
             ),
             ("zoom_out", &["<Control>minus", "<Control>KP_Subtract"]),
             ("zoom_reset", &["<Control>0", "<Control>KP_0"]),
-            ("fullscreen", &["F11"]),
+            // F11 is handled by the capture-phase key controller below.
+            ("fullscreen", &[]),
             ("preferences", &["<Control>comma"]),
         ] {
             let action = gio::SimpleAction::new(id, None);
@@ -303,12 +304,20 @@ impl Browser {
             glib::Propagation::Proceed
         });
         window.add_controller(keys);
-        // The web view consumes Escape, so leave browser full screen before it
-        // sees the key. Page-requested full screen is left to WebKit.
+        // The web view can consume F11 and Escape, so handle full screen keys
+        // before it sees them. Page-requested full screen is left to WebKit.
         let escape = gtk4::EventControllerKey::new();
         escape.set_propagation_phase(gtk4::PropagationPhase::Capture);
         let weak = Rc::downgrade(self);
-        escape.connect_key_pressed(move |_, key, _, _| {
+        escape.connect_key_pressed(move |_, key, _, modifiers| {
+            if key == gtk4::gdk::Key::F11
+                && !modifiers.intersects(gtk4::accelerator_get_default_mod_mask())
+                && let Some(browser) = weak.upgrade()
+                && !browser.page_fullscreen.get()
+            {
+                browser.set_fullscreen(!browser.fullscreen.get());
+                return glib::Propagation::Stop;
+            }
             if key == gtk4::gdk::Key::Escape
                 && let Some(browser) = weak.upgrade()
                 && browser.fullscreen.get()
