@@ -86,6 +86,7 @@ XTST.XTestFakeKeyEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int,
 F11 = 0xFFC8
 F9 = 0xFFC6
 F12 = 0xFFC9
+F5 = 0xFFC2
 
 
 def eventually(check, message, timeout=12):
@@ -667,7 +668,7 @@ def web_platform(binary, directory, base, screenshots):
             if hidden == "none":
                 break
             time.sleep(0.5)
-            browser.key("F5")
+            browser.plain_key(F5)
         assert hidden == "none", f"Element hiding did not apply: display {hidden}"
         start_height = int(event("height", 0))
 
@@ -693,7 +694,7 @@ def web_platform(binary, directory, base, screenshots):
         assert saved == [{"origin": base, "permission": "notifications", "allowed": True}], saved
 
         since = Fixture.event_mark()
-        browser.key("F5")
+        browser.plain_key(F5)
         event("notification", since, "granted", "The remembered answer was not given to the page")
         event("query", since, "granted", "navigator.permissions did not report the answer")
 
@@ -727,7 +728,7 @@ def web_platform(binary, directory, base, screenshots):
         browser.frame("site-info")
         browser.key("Escape")
         since = Fixture.event_mark()
-        browser.key("F5")
+        browser.plain_key(F5)
         event("cookie", since, "kept", "The page cookie was not stored")
         assert browser.matching_history(page, "Platform"), "The page was not in the history"
         browser.key("ctrl+shift+Delete")
@@ -740,7 +741,7 @@ def web_platform(binary, directory, base, screenshots):
                    "Clearing did not remove the history entry")
         time.sleep(0.5)
         since = Fixture.event_mark()
-        browser.key("F5")
+        browser.plain_key(F5)
         event("cookie", since, "none", "Clearing did not remove the site's cookie")
         browser.key("ctrl+k")
         browser.xdotool("type", "--clearmodifiers", "--delay", "0", "site permissions")
