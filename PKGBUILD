@@ -9,6 +9,8 @@ url='https://github.com/bernardopg/bitter-browser'
 license=('MPL-2.0')
 depends=('gcc-libs' 'glib2' 'glibc' 'gtk4' 'libadwaita' 'webkitgtk-6.0')
 makedepends=('cargo' 'git' 'meson')
+# The bundled SQLite is C; makepkg LTO turns it into GCC bitcode that the Rust linker cannot read.
+options=('!lto')
 provides=('bitter-browser')
 conflicts=('bitter-browser')
 source=('git+https://github.com/bernardopg/bitter-browser.git')
