@@ -403,4 +403,50 @@ mod tests {
         assert_eq!(avatar("docs.flatpak.org"), avatar("flatpak.org"));
         assert_eq!(site_name("localhost"), "localhost");
     }
+
+    #[test]
+    fn escape_html_escapes_every_special_character() {
+        assert_eq!(
+            escape_html("<a href=\"x\">&'</a>"),
+            "&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;"
+        );
+    }
+
+    #[test]
+    fn lists_use_inert_rows_for_non_web_addresses() {
+        let rows = vec![
+            ("file:///tmp/a.txt".to_owned(), "Local".to_owned()),
+            ("javascript:alert(1)".to_owned(), "Bad".to_owned()),
+        ];
+        let html = list(&Look::default(), ListKind::History, &rows);
+        assert!(html.contains("<a class=\"row\""));
+        assert!(html.contains("<div class=\"row inert\""));
+        assert!(!html.contains("href=\"javascript:"));
+    }
+
+    #[test]
+    fn new_tab_limits_frequent_sites_to_eight() {
+        let mut frequent = Vec::new();
+        for index in 0..10 {
+            frequent.push((
+                format!("https://site{index}.test/"),
+                format!("Site {index}"),
+            ));
+        }
+        let html = new_tab(&Look::default(), &frequent);
+        assert!(html.contains("Site 7"));
+        assert!(!html.contains("Site 8"));
+    }
+
+    #[test]
+    fn display_hosts_and_site_names_come_from_parsed_urls() {
+        assert_eq!(
+            display_host("https://www.Example.test/path?x=1#frag"),
+            "example.test"
+        );
+        assert_eq!(display_host("not a url"), "not a url");
+        assert_eq!(site_name(""), "");
+        assert_eq!(site_name("one"), "one");
+        assert_eq!(site_name("a.b"), "a");
+    }
 }

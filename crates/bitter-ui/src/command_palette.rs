@@ -388,3 +388,29 @@ fn build_command_row(command: &Command) -> gtk4::ListBoxRow {
 
     row.upcast()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Command, command_matches};
+
+    fn command(title: &'static str, keywords: &'static [&'static str]) -> Command {
+        Command {
+            id: "test",
+            title,
+            icon: "",
+            shortcut: "",
+            keywords,
+        }
+    }
+
+    #[test]
+    fn command_matches_title_or_keywords() {
+        let cmd = command("Close Tab", &["remove", "tab"]);
+        assert!(command_matches(&cmd, "close"));
+        assert!(command_matches(&cmd, "tab"));
+        assert!(command_matches(&cmd, "remov"));
+        assert!(!command_matches(&cmd, "open"));
+        assert!(!command_matches(&cmd, "nothing here"));
+        assert!(command_matches(&cmd, ""));
+    }
+}

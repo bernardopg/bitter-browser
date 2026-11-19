@@ -215,3 +215,31 @@ impl TabView {
         self.pages.set_visible_child_name("problem");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Tab;
+    use bitter_core::session::SavedTab;
+
+    #[test]
+    fn tab_round_trips_its_saved_uri_and_title() {
+        let tab = Tab::new(SavedTab {
+            uri: "https://example.test/".into(),
+            title: "Example".into(),
+        });
+        assert_eq!(tab.uri(), "https://example.test/");
+        assert_eq!(tab.title(), "Example");
+        tab.update("https://example.test/other", "Other title");
+        assert_eq!(tab.uri(), "https://example.test/other");
+        assert_eq!(tab.title(), "Other title");
+        assert_eq!(
+            tab.saved(),
+            SavedTab {
+                uri: "https://example.test/other".into(),
+                title: "Other title".into(),
+            }
+        );
+        // Every tab has a unique id.
+        assert_ne!(tab.id, Tab::new(SavedTab::new("https://a.test/", "A")).id);
+    }
+}

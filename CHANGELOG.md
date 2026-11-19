@@ -5,6 +5,20 @@ All notable changes to Bitter Browser are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- Addresses with embedded credentials (`user:pass@`) are no longer recorded in
+  history.
+- Cycling tabs and reordering tabs no longer panic when a workspace has no
+  tabs.
+
+### Changed
+
+- Expanded the test suite from 58 to 104 tests; line coverage is 40.24%
+  (`cargo llvm-cov`), up from 32.7%.
+
 ## [0.3.0] - 2026-11-19
 
 ### Added

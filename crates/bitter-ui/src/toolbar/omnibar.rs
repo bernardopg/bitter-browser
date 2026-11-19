@@ -188,4 +188,20 @@ mod tests {
         );
         assert_eq!(Security::for_address("", false), Security::Local);
     }
+
+    #[test]
+    fn connection_icons_match_the_security_state() {
+        assert_eq!(
+            Security::Secure.icon(),
+            ("channel-secure-symbolic", "Secure connection")
+        );
+        assert_eq!(
+            Security::Insecure.icon(),
+            ("channel-insecure-symbolic", "Connection is not secure")
+        );
+        assert_eq!(
+            Security::Local.icon(),
+            ("system-search-symbolic", "Search or enter address")
+        );
+    }
 }

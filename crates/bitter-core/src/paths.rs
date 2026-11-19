@@ -244,4 +244,15 @@ mod tests {
         assert!(Profile::open_at(root.path(), root.path(), root.path()).is_err());
         assert_eq!(fs::read(sentinel).unwrap(), b"unchanged");
     }
+
+    #[test]
+    fn webkit_path_requires_utf8() {
+        use std::os::unix::ffi::OsStringExt;
+        let invalid = PathBuf::from(std::ffi::OsString::from_vec(vec![0xff, b'x']));
+        assert!(matches!(
+            webkit_path(&invalid),
+            Err(ProfileError::UnsupportedPath(_))
+        ));
+        assert!(webkit_path(Path::new("/tmp/bitter")).is_ok());
+    }
 }

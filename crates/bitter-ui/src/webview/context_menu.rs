@@ -149,3 +149,30 @@ pub fn customize(menu: &ContextMenu, hit: &HitTestResult, actions: &MenuActions,
         ));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::label;
+    use webkit6::ContextMenuAction;
+
+    #[test]
+    fn stock_actions_get_english_labels() {
+        assert_eq!(label(ContextMenuAction::OpenLink), Some("Open Link"));
+        assert_eq!(
+            label(ContextMenuAction::DownloadLinkToDisk),
+            Some("Download Linked File")
+        );
+        assert_eq!(
+            label(ContextMenuAction::CopyLinkToClipboard),
+            Some("Copy Link")
+        );
+        assert_eq!(
+            label(ContextMenuAction::InspectElement),
+            Some("Inspect Element")
+        );
+        assert_eq!(label(ContextMenuAction::MediaPlay), Some("Play"));
+        assert_eq!(label(ContextMenuAction::MediaPause), Some("Pause"));
+        assert_eq!(label(ContextMenuAction::InsertEmoji), Some("Insert Emoji"));
+        assert_eq!(label(ContextMenuAction::OpenFrameInNewWindow), None);
+    }
+}

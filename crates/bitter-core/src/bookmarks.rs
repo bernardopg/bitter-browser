@@ -154,4 +154,62 @@ mod tests {
             .unwrap();
         assert!(bookmarks.get_all().unwrap().is_empty());
     }
+
+    #[test]
+    fn add_bookmark_updates_titles_and_reports_bookmarked() {
+        let dir = tempfile::tempdir().unwrap();
+        let bookmarks = Bookmarks::open(dir.path()).unwrap();
+        assert!(!bookmarks.is_bookmarked("https://a.test/").unwrap());
+        bookmarks
+            .add_bookmark("https://a.test/", Some("First"))
+            .unwrap();
+        assert!(bookmarks.is_bookmarked("https://a.test/").unwrap());
+        bookmarks
+            .add_bookmark("https://a.test/", Some("Second"))
+            .unwrap();
+        assert_eq!(
+            bookmarks.get_all().unwrap(),
+            [("https://a.test/".to_owned(), "Second".to_owned())]
+        );
+        bookmarks.remove_bookmark("https://a.test/").unwrap();
+        assert!(!bookmarks.is_bookmarked("https://a.test/").unwrap());
+    }
+
+    #[test]
+    fn get_all_orders_by_recency() {
+        let dir = tempfile::tempdir().unwrap();
+        let bookmarks = Bookmarks::open(dir.path()).unwrap();
+        bookmarks.add_bookmark("https://a.test/", None).unwrap();
+        bookmarks.add_bookmark("https://b.test/", None).unwrap();
+        let urls: Vec<String> = bookmarks
+            .get_all()
+            .unwrap()
+            .into_iter()
+            .map(|(url, _)| url)
+            .collect();
+        assert_eq!(
+            urls,
+            ["https://b.test/".to_owned(), "https://a.test/".to_owned()]
+        );
+    }
+
+    #[test]
+    fn search_escapes_wildcards_and_matches_urls_and_titles() {
+        let dir = tempfile::tempdir().unwrap();
+        let bookmarks = Bookmarks::open(dir.path()).unwrap();
+        bookmarks
+            .add_bookmark("https://a.test/report%20file?x=_1", Some("Docs & News"))
+            .unwrap();
+        bookmarks.add_bookmark("https://b.test/", None).unwrap();
+        assert_eq!(
+            bookmarks.search("report").unwrap()[0].0,
+            "https://a.test/report%20file?x=_1"
+        );
+        assert_eq!(bookmarks.search("docs").unwrap()[0].1, "Docs & News");
+        assert_eq!(bookmarks.search("%20").unwrap().len(), 1);
+        assert_eq!(bookmarks.search("_1").unwrap().len(), 1);
+        assert_eq!(bookmarks.search("b.test").unwrap().len(), 1);
+        assert!(bookmarks.search("nothing").unwrap().is_empty());
+        assert_eq!(bookmarks.search("DOCS").unwrap().len(), 1);
+    }
 }

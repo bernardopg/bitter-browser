@@ -556,4 +556,19 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn engine_and_theme_labels_are_shown_in_the_product() {
+        for engine in SearchEngine::ALL {
+            let uri = url::Url::parse(&engine.search_url("query")).unwrap();
+            assert_eq!(uri.scheme(), "https");
+            assert!(!engine.label().is_empty());
+        }
+        assert_eq!(SearchEngine::DuckDuckGo.label(), "DuckDuckGo");
+        assert_eq!(SearchEngine::Brave.label(), "Brave Search");
+        assert_eq!(SearchEngine::Google.label(), "Google");
+        assert_eq!(Theme::System.label(), "System");
+        assert_eq!(Theme::Light.label(), "Light");
+        assert_eq!(Theme::Dark.label(), "Dark");
+    }
 }

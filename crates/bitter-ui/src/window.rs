@@ -777,6 +777,9 @@ impl Browser {
         let index = {
             let all = self.workspaces.borrow();
             let group = &all[workspace.index()];
+            if group.tabs.is_empty() {
+                return;
+            }
             (group.selected as isize + offset).rem_euclid(group.tabs.len() as isize) as usize
         };
         self.select(workspace, index);
@@ -787,6 +790,9 @@ impl Browser {
         let (index, tab) = {
             let mut all = self.workspaces.borrow_mut();
             let group = &mut all[workspace.index()];
+            if group.tabs.is_empty() {
+                return;
+            }
             let current = group.selected;
             let next = (current as isize + offset).clamp(0, group.tabs.len() as isize - 1) as usize;
             if next == current {
@@ -1407,8 +1413,12 @@ fn address_text(uri: &str) -> &str {
 }
 
 fn is_recordable_uri(uri: &str) -> bool {
-    url::Url::parse(uri)
-        .is_ok_and(|url| matches!(url.scheme(), "http" | "https") && url.host().is_some())
+    url::Url::parse(uri).is_ok_and(|url| {
+        matches!(url.scheme(), "http" | "https")
+            && url.host().is_some()
+            && url.username().is_empty()
+            && url.password().is_none()
+    })
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -1647,5 +1657,66 @@ mod tests {
         assert_eq!(selection_after_close(3, 3, 3), 2);
         assert_eq!(selection_after_close(1, 2, 3), 1);
         assert_eq!(selection_after_close(0, 0, 0), 0);
+    }
+
+    #[test]
+    fn address_text_hides_internal_and_blank_pages() {
+        assert_eq!(address_text(HOME_URI), "");
+        assert_eq!(address_text("bitter://newtab/"), "");
+        assert_eq!(address_text("bitter://history"), "bitter://history");
+        assert_eq!(
+            address_text("https://example.test/"),
+            "https://example.test/"
+        );
+    }
+
+    #[test]
+    fn recordable_uris_exclude_internal_pages_and_credentials() {
+        assert!(is_recordable_uri("https://example.test/"));
+        assert!(is_recordable_uri("http://127.0.0.1:8080/"));
+        assert!(!is_recordable_uri("bitter://history"));
+        assert!(!is_recordable_uri("file:///tmp/page"));
+        assert!(!is_recordable_uri("not a url"));
+        assert!(!is_recordable_uri("https://user@example.test/"));
+        assert!(!is_recordable_uri("https://user:pass@example.test/"));
+    }
+
+    #[test]
+    fn navigation_target_accepts_hosts_and_rejects_other_schemes() {
+        for engine in SearchEngine::ALL {
+            assert_eq!(
+                navigation_target("Example.Test", engine),
+                Ok(Some(Target::Address("https://example.test/".into())))
+            );
+            assert_eq!(
+                navigation_target("HTTPS://EXAMPLE.TEST/", engine),
+                Ok(Some(Target::Address("https://example.test/".into())))
+            );
+            assert_eq!(
+                navigation_target("http://a.test", engine),
+                Ok(Some(Target::Address("http://a.test/".into())))
+            );
+            assert_eq!(
+                navigation_target("file:///tmp/x.html", engine),
+                Ok(Some(Target::Address("file:///tmp/x.html".into())))
+            );
+            assert_eq!(
+                navigation_target("about:blank", engine),
+                Ok(Some(Target::Address("about:blank".into())))
+            );
+            assert_eq!(
+                navigation_target("bitter://newtab", engine),
+                Ok(Some(Target::Address("bitter://newtab".into())))
+            );
+            assert_eq!(
+                navigation_target("ftp://example.test/", engine),
+                Err("This address scheme is unavailable.")
+            );
+            assert_eq!(
+                navigation_target("mailto:someone@example.test", engine),
+                Err("This address scheme is unavailable.")
+            );
+            assert_eq!(navigation_target("", engine), Ok(None));
+        }
     }
 }

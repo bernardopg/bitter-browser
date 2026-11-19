@@ -249,4 +249,30 @@ mod tests {
             "audio-input-microphone-symbolic"
         );
     }
+
+    #[test]
+    fn questions_cover_automatic_and_empty_requests() {
+        let ask = |permissions: &[Permission]| Request::Ask(permissions.to_vec());
+        assert_eq!(
+            message("site", &Request::Automatic(true)),
+            "site wants to access your device"
+        );
+        assert_eq!(
+            message("site", &Request::Automatic(false)),
+            "site wants to access your device"
+        );
+        assert_eq!(
+            message("site", &ask(&[])),
+            "site wants to access your device"
+        );
+        assert_eq!(
+            message(
+                "site",
+                &ask(&[Permission::Clipboard, Permission::Notifications])
+            ),
+            "site wants to see text and images you copied"
+        );
+        assert_eq!(icon(&ask(&[Permission::Camera])), "camera-web-symbolic");
+        assert_eq!(icon(&Request::Automatic(true)), "dialog-question-symbolic");
+    }
 }
