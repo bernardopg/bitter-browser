@@ -17,11 +17,9 @@
     ],
     "build-options": {
         "append-path": "/usr/lib/sdk/rust-stable/bin",
-        "build-args": [
-            "--share=network"
-        ],
         "env": {
-            "CARGO_HOME": "/run/build/bitter-browser/cargo"
+            "CARGO_HOME": "/run/build/bitter-browser/cargo",
+            "CARGO_NET_OFFLINE": "true"
         }
     },
     "modules": [
@@ -31,8 +29,20 @@
             "sources": [
                 {
                     "type": "dir",
-                    "path": ".."
-                }
+                    "path": "..",
+                    "skip": [
+                        "target",
+                        "builddir",
+                        "build-dir",
+                        ".flatpak-builder",
+                        ".git",
+                        "graphify-out",
+                        ".tokensave",
+                        ".headroom",
+                        "repo"
+                    ]
+                },
+                "cargo-sources.json"
             ]
         }
     ]
