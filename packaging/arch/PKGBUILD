@@ -1,0 +1,37 @@
+# Maintainer: Bitter Browser Contributors <https://github.com/bernardopg/bitter-browser>
+# Release package: builds the tagged source archive.
+pkgname=bitter-browser
+pkgver=0.2.0
+pkgrel=1
+pkgdesc='Focused, native web browser for the Linux desktop'
+arch=('x86_64')
+url='https://github.com/bernardopg/bitter-browser'
+license=('MPL-2.0')
+depends=('gcc-libs' 'glib2' 'glibc' 'gtk4' 'libadwaita' 'webkitgtk-6.0')
+makedepends=('cargo' 'meson')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+    cd "$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc --print host-tuple)"
+}
+
+build() {
+    cd "$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable CARGO_NET_OFFLINE=true
+    arch-meson . build
+    meson compile -C build
+}
+
+check() {
+    cd "$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=build/cargo-target
+    cargo test --frozen --release --workspace
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    meson install -C build --destdir "$pkgdir"
+}
