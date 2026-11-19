@@ -48,6 +48,13 @@ pub(super) fn connect(browser: &Rc<Browser>) {
         .css_classes(["omnibar-suggestions"])
         .build();
     popover.set_parent(omnibar.widget());
+    // GtkEntry does not manage extra children; release the popover with it.
+    let weak_popover = popover.downgrade();
+    omnibar.widget().connect_destroy(move |_| {
+        if let Some(popover) = weak_popover.upgrade() {
+            popover.unparent();
+        }
+    });
     let scroll = gtk4::ScrolledWindow::builder()
         .width_request(300)
         .max_content_height(310)
