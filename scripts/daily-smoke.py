@@ -521,6 +521,7 @@ def main():
         except Exception:
             print("Last snapshot:", browser.current(), flush=True)
             print("HTTP requests:", dict(Fixture.paths), flush=True)
+            print("Probe reports:", Fixture.reports, flush=True)
             if browser.log.exists():
                 print(browser.log.read_text(), flush=True)
             raise

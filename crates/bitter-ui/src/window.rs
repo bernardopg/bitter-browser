@@ -321,10 +321,15 @@ impl Browser {
             glib::Propagation::Proceed
         });
         window.add_controller(escape);
+        // Follow the window manager only after it confirmed full screen, so a
+        // request it has not applied yet does not restore the chrome.
         let weak = Rc::downgrade(self);
+        let confirmed = Cell::new(false);
         window.connect_fullscreened_notify(move |window| {
-            if let Some(browser) = weak.upgrade()
-                && !window.is_fullscreen()
+            if window.is_fullscreen() {
+                confirmed.set(true);
+            } else if confirmed.replace(false)
+                && let Some(browser) = weak.upgrade()
             {
                 browser.set_fullscreen(false);
             }
