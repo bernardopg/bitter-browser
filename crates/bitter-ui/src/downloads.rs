@@ -402,7 +402,7 @@ impl Downloads {
         }
     }
 
-    fn clear_finished(&self) {
+    pub fn clear_finished(&self) {
         let mut rows = self.rows.borrow_mut();
         rows.retain(|row| {
             if row.finished.get() {

@@ -275,6 +275,43 @@ const APP_CSS: &str = r#"
   min-height: 42px;
   transition: background-color 120ms ease;
 }
+
+/* Permission requests: a bar above the page, tinted with the accent. */
+.permission-bar {
+  padding: 10px 14px 10px 16px;
+  background-color: mix(@window_bg_color, @accent_bg_color, 0.1);
+  border-bottom: 1px solid alpha(@accent_bg_color, 0.25);
+}
+
+.permission-bar image {
+  color: @accent_color;
+}
+
+.permission-bar button {
+  min-height: 30px;
+  padding: 0 16px;
+}
+
+/* Where a hovered link goes, in the page's bottom corner. */
+.link-status {
+  margin: 0 0 6px 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.88em;
+  color: @window_fg_color;
+  background-color: alpha(@window_bg_color, 0.94);
+  border: 1px solid alpha(currentColor, 0.1);
+  box-shadow: 0 2px 8px alpha(black, 0.16);
+}
+
+/* The address bar's connection icon opens the site panel. */
+.omnibar image:first-child {
+  transition: opacity 120ms ease;
+}
+
+.omnibar image:first-child:hover {
+  opacity: 0.7;
+}
 "#;
 
 pub fn load() {

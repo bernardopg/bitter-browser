@@ -133,6 +133,16 @@ impl Omnibar {
         self.entry.add_controller(focus_controller);
     }
 
+    /// Clicks on the connection icon at the start of the bar.
+    pub fn connect_icon_pressed<F: Fn(&gtk4::Entry) + 'static>(&self, f: F) {
+        self.entry.set_primary_icon_activatable(true);
+        self.entry.connect_icon_press(move |entry, position| {
+            if position == gtk4::EntryIconPosition::Primary {
+                f(entry);
+            }
+        });
+    }
+
     pub fn connect_key_pressed<
         F: Fn(gtk4::gdk::Key, gtk4::gdk::ModifierType) -> gtk4::glib::Propagation + 'static,
     >(

@@ -5,7 +5,7 @@ This is the tracked roadmap for bringing the current experimental Linux browser 
 ## Current baseline and decisions
 
 - GTK 4/libadwaita and WebKitGTK 6 provide an experimental window, tabs, an omnibar and SQLite-backed history/bookmarks. `crates/bitter-ui/src/window.rs` renders internal HTML pages and opens native preferences through the window action.
-- `bitter-adblock`, `bitter-net` and `bitter-devtools` are scaffolds; the CLI currently prints a placeholder. Native preferences mark ad and tracker blocking and HTTPS-only mode as unavailable.
+- `bitter-adblock` converts Adblock Plus lists (a built-in list, EasyList and EasyPrivacy) into WebKit content blocker rules; the browser downloads, compiles and refreshes them and allows per-site exceptions. HTTPS-only mode, per-origin permissions for notifications, location, camera, microphone and clipboard, `window.open` pop-ups with `window.opener`, the WebKit inspector and clearing browsing data are implemented and covered by the local smoke test. `bitter-net` and `bitter-devtools` are scaffolds; the CLI currently prints a placeholder. These implementations still need the reviews and acceptance evidence that SEC-04 to SEC-07, NET-02 and DEV-01 ask for.
 - CI generates workspace-wide coverage, but the last local measurement at the time this roadmap was written was 6.79% of instrumented lines; GUI and real-web behavior were not exercised. Re-measure on the target commit rather than treating this number as permanent.
 - Scope is initially Linux x86-64, Wayland/X11 and the documented Flatpak/Arch paths. Product owners must decide minimum supported environments and optional features before promising them. No production-readiness or security audit is implied.
 

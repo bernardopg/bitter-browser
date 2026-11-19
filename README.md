@@ -30,9 +30,9 @@ libadwaita and WebKitGTK 6. Tabs live in a vertical sidebar, split across two
 workspaces, and the interface follows the GNOME design language.
 
 > [!WARNING]
-> Bitter Browser is **experimental** and not ready for sensitive browsing.
-> Ad and tracker blocking and HTTPS-only mode are not available yet. Read the
-> [security policy](SECURITY.md) and the [roadmap](TASKS.md) before relying on it.
+> Bitter Browser is **experimental** and has not had an independent security
+> review. Read the [security policy](SECURITY.md) and the [roadmap](TASKS.md)
+> before relying on it for sensitive browsing.
 
 ## Features
 
@@ -43,10 +43,17 @@ workspaces, and the interface follows the GNOME design language.
 | **Smart address bar** | Suggestions from local history, bookmarks and open tabs, queried off the UI thread. |
 | **Navigation feedback** | Loading progress, Stop, and native error pages with *Try Again*. |
 | **Tab control** | Reopen closed tabs, reorder from the keyboard, open links in the background, site icons. |
-| **Downloads** | Saved to your downloads folder under safe, unique names, with progress, cancel and open. |
-| **Page tools** | Find in page, per-tab zoom and full screen for the browser, videos and pages. |
+| **Downloads** | Saved to your downloads folder under safe, unique names, or where you choose, with progress, cancel and open. |
+| **Page tools** | Find in page, per-site zoom, printing and full screen for the browser, videos and pages. |
+| **Sign-in pop-ups** | Pages opened with `window.open` become tabs that keep `window.opener`, so "Sign in with…" and payment windows work. |
+| **Site permissions** | Sites ask before using notifications, location, camera, microphone or the clipboard; answers are remembered per site and can be changed from the address bar or preferences. |
+| **Content blocking** | Blocks ads and trackers with EasyList and EasyPrivacy, compiled by WebKit and refreshed every few days, with a per-site switch. |
+| **HTTPS-only mode** | Loads sites over HTTPS and asks before opening a site that has no secure version. |
+| **Privacy controls** | Cross-site tracking prevention, third-party cookie blocking and clearing history, cookies, cache and downloads by time range. |
+| **Context menu** | Open links and images in a new or background tab, and search the selected text. Hovered links show their address. |
+| **Developer tools** | Web Inspector with F12, Ctrl+Shift+I or Inspect Element. |
 | **Desktop integration** | Opens links from other applications in the running window. |
-| **Native preferences** | Search provider, color scheme and startup behavior, saved immediately and atomically. |
+| **Native preferences** | General, privacy, permissions and advanced pages, saved immediately and atomically. |
 | **Local data** | SQLite history and bookmarks with versioned migrations and a locked XDG profile. |
 
 <table>

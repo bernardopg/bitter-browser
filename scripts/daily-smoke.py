@@ -51,6 +51,29 @@ setInterval(() => {
 </script>"""
 
 
+PLATFORM_PAGE = """<style>body{margin:0;font:16px sans-serif}button,a{position:absolute;left:10px;height:30px}</style>
+<button style="top:10px" onclick="window.open('/popup-child', 'child', 'width=500,height=400')">Pop up</button>
+<button style="top:70px" onclick="Notification.requestPermission().then(p => ev('requested', p))">Notify</button>
+<a style="top:130px" href="/linked">A link to follow</a>
+<ins class="adsbygoogle" style="display:block;position:absolute;top:200px;width:60px;height:60px">Ad</ins>
+<script>
+const ev = (name, value) => fetch("/event?" + encodeURIComponent(name + "=" + value)).catch(() => {});
+addEventListener("message", event => ev("message", event.data));
+ev("notification", Notification.permission);
+ev("cookie", document.cookie.includes("visited=1") ? "kept" : "none");
+document.cookie = "visited=1; max-age=86400; path=/";
+navigator.permissions.query({name: "notifications"}).then(state => ev("query", state.state));
+let height = 0;
+setInterval(() => { if (innerHeight !== height) { height = innerHeight; ev("height", height); } }, 100);
+setTimeout(() => ev("ad", getComputedStyle(document.querySelector(".adsbygoogle")).display), 300);
+</script>"""
+POPUP_CHILD = """<p>Pop-up</p><script>
+fetch("/event?" + encodeURIComponent("opener=" + !!window.opener));
+if (window.opener) window.opener.postMessage("hello from the pop-up", "*");
+setTimeout(() => window.close(), 1200);
+</script>"""
+
+
 XLIB = ctypes.CDLL(ctypes.util.find_library("X11"))
 XTST = ctypes.CDLL(ctypes.util.find_library("Xtst"))
 XLIB.XOpenDisplay.restype = ctypes.c_void_p
@@ -62,6 +85,7 @@ XLIB.XCloseDisplay.argtypes = [ctypes.c_void_p]
 XTST.XTestFakeKeyEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int, ctypes.c_ulong]
 F11 = 0xFFC8
 F9 = 0xFFC6
+F12 = 0xFFC9
 
 
 def eventually(check, message, timeout=12):
@@ -81,6 +105,18 @@ class Fixture(BaseHTTPRequestHandler):
 
     reports = []
     uploads = []
+    events = []
+
+    @classmethod
+    def event(cls, name, since=0):
+        """The newest value reported for `name` after `since` events."""
+        with cls.lock:
+            return next((value for key, value in reversed(cls.events[since:]) if key == name), None)
+
+    @classmethod
+    def event_mark(cls):
+        with cls.lock:
+            return len(cls.events)
 
     @classmethod
     def report(cls, predicate, since=0):
@@ -133,6 +169,13 @@ class Fixture(BaseHTTPRequestHandler):
             return
         if self.path == "/slow":
             self.release_slow.wait(10)
+        if self.path.startswith("/event?"):
+            name, value = urllib.parse.unquote(self.path[7:]).split("=", 1)
+            with self.lock:
+                self.events.append((name, value))
+            self.send_response(204)
+            self.end_headers()
+            return
         if self.path.startswith("/uploaded?"):
             with self.lock:
                 self.uploads.append(urllib.parse.unquote(self.path[10:]))
@@ -143,6 +186,10 @@ class Fixture(BaseHTTPRequestHandler):
             body = UPLOAD_PAGE
         elif self.path == "/probe":
             body = PROBE_PAGE
+        elif self.path == "/platform":
+            body = PLATFORM_PAGE
+        elif self.path == "/popup-child":
+            body = POPUP_CHILD
         elif self.path == "/home":
             body = """<a href="/background" style="position:absolute; top:10px; left:10px">Open in background</a>
 <a href="/target" target="_blank" style="position:absolute; top:60px; left:10px">Open in a new tab</a>"""
@@ -186,6 +233,8 @@ class Browser:
             # Use in-process GTK dialogs so the harness can drive them.
             "GDK_DEBUG": "no-portals",
             "GSETTINGS_SCHEMA_DIR": str(directory / "schemas"),
+            # Block with the built-in list only; never fetch EasyList in tests.
+            "BITTER_OFFLINE_FILTER_LISTS": "1",
         }
         (directory / "schemas").mkdir()
         subprocess.run(["glib-compile-schemas", "--targetdir", self.env["GSETTINGS_SCHEMA_DIR"],
@@ -585,6 +634,127 @@ def dialogs_and_persistence(binary, directory, base, screenshots):
     return {"uploaded": True, "restored_zoom_width": zoomed[1], "default_width": width}
 
 
+def web_platform(binary, directory, base, screenshots):
+    """Pop-ups, permission prompts, the context menu, developer tools,
+    content blocking and the site and privacy panels."""
+    browser = Browser(binary, directory, screenshots)
+    settings = browser.profile / "site-settings.json"
+    page = f"{base}/platform"
+    # Page coordinates to window coordinates: sidebar and toolbar.
+    left, top = 226, 59
+
+    def event(name, since, expected=None, message=None):
+        return eventually(
+            lambda: (value := Fixture.event(name, since)) is not None
+            and (expected is None or value == expected) and value,
+            message or f"No {name} event{'' if expected is None else ' = ' + expected}: {Fixture.events[since:]}")
+
+    def main_tabs():
+        session = browser.current()
+        return tab_paths(session, 0) if session else []
+
+    try:
+        browser.start()
+        since = Fixture.event_mark()
+        browser.enter(page)
+        event("notification", since, "default")
+        event("query", since, "prompt")
+        # The built-in list hides `.adsbygoogle`; it compiles on first start.
+        hidden = None
+        for _ in range(20):
+            since = Fixture.event_mark()
+            hidden = event("ad", since)
+            if hidden == "none":
+                break
+            time.sleep(0.5)
+            browser.key("F5")
+        assert hidden == "none", f"Element hiding did not apply: display {hidden}"
+        start_height = int(event("height", 0))
+
+        since = Fixture.event_mark()
+        browser.click(left + 40, top + 25)
+        event("opener", since, "true", "The pop-up did not keep window.opener")
+        event("message", since, "hello from the pop-up", "The opener did not receive postMessage")
+        eventually(lambda: len(main_tabs()) == 2 and "popup-child" in main_tabs()[1],
+                   f"The pop-up did not open as the next tab: {main_tabs()}")
+        browser.frame("popup")
+        eventually(lambda: main_tabs() == [page], f"window.close() did not close the pop-up: {main_tabs()}")
+
+        since = Fixture.event_mark()
+        browser.click(left + 40, top + 85)
+        time.sleep(0.8)
+        browser.frame("permission-bar")
+        width, _ = browser.size()
+        browser.click(width - 52, top + 25)
+        event("requested", since, "granted", "Allowing notifications did not reach the page")
+        eventually(lambda: settings.exists() and '"notifications"' in settings.read_text(),
+                   "The notification answer was not remembered")
+        saved = json.loads(settings.read_text())["permissions"]
+        assert saved == [{"origin": base, "permission": "notifications", "allowed": True}], saved
+
+        since = Fixture.event_mark()
+        browser.key("F5")
+        event("notification", since, "granted", "The remembered answer was not given to the page")
+        event("query", since, "granted", "navigator.permissions did not report the answer")
+
+        browser.xdotool("mousemove", "--window", browser.window, str(left + 50), str(top + 140))
+        time.sleep(0.5)
+        browser.frame("link-status")
+        browser.xdotool("click", "3")
+        time.sleep(0.8)
+        browser.frame("context-menu")
+        # The menu opens at the pointer; the second item opens a new tab.
+        browser.click(left + 150, top + 140 + 56)
+        eventually(lambda: len(main_tabs()) == 2 and main_tabs()[1].endswith("/linked")
+                   and browser.current()["workspaces"][0]["selected"] == 1,
+                   f"Open Link in New Tab did not open a tab: {browser.current()}")
+        browser.key("ctrl+w")
+        eventually(lambda: main_tabs() == [page], f"Could not close the linked tab: {main_tabs()}")
+
+        since = Fixture.event_mark()
+        browser.plain_key(F12)
+        eventually(lambda: (value := Fixture.event("height", since)) and int(value) < start_height - 100,
+                   "F12 did not open the Web Inspector")
+        time.sleep(1)
+        browser.frame("devtools")
+        since = Fixture.event_mark()
+        browser.plain_key(F12)
+        eventually(lambda: (value := Fixture.event("height", since)) and int(value) == start_height,
+                   "F12 did not close the Web Inspector")
+
+        browser.click(406, 29)
+        time.sleep(0.6)
+        browser.frame("site-info")
+        browser.key("Escape")
+        since = Fixture.event_mark()
+        browser.key("F5")
+        event("cookie", since, "kept", "The page cookie was not stored")
+        assert browser.matching_history(page, "Platform"), "The page was not in the history"
+        browser.key("ctrl+shift+Delete")
+        time.sleep(0.6)
+        browser.frame("clear-data")
+        width, height = browser.size()
+        # "Clear Data", the dialog's right-hand button.
+        browser.click(width // 2 + 98, height // 2 + 137)
+        eventually(lambda: not browser.matching_history(page, "Platform"),
+                   "Clearing did not remove the history entry")
+        time.sleep(0.5)
+        since = Fixture.event_mark()
+        browser.key("F5")
+        event("cookie", since, "none", "Clearing did not remove the site's cookie")
+        browser.key("ctrl+k")
+        browser.xdotool("type", "--clearmodifiers", "--delay", "0", "site permissions")
+        time.sleep(0.3)
+        browser.key("Return")
+        time.sleep(0.8)
+        browser.frame("site-permissions")
+        browser.key("Escape")
+    finally:
+        browser.stop()
+    return {"popup_opener": True, "notification_remembered": True, "context_menu_tab": True,
+            "devtools": True, "element_hiding": True, "cleared_history_and_cookies": True}
+
+
 def window_geometry(binary, directory):
     browser = Browser(binary, directory, None)
     keyfile = directory / "config" / "glib-2.0" / "settings" / "keyfile"
@@ -658,6 +828,8 @@ def main():
             print(json.dumps(window_geometry(args.binary, directory / "geometry")), flush=True)
             print(json.dumps(dialogs_and_persistence(args.binary, directory / "dialogs", base,
                                                      args.screenshots)), flush=True)
+            print(json.dumps(web_platform(args.binary, directory / "platform", base,
+                                          args.screenshots)), flush=True)
             if args.benchmark_samples:
                 print(json.dumps(benchmark(args.binary, directory, base, args.benchmark_samples), indent=2))
             assert "panicked" not in browser.log.read_text(), browser.log.read_text()

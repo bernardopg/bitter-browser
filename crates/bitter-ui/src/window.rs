@@ -1,14 +1,19 @@
 use crate::command_palette::CommandPalette;
+use crate::content_blocking::ContentBlocker;
 use crate::downloads::Downloads;
 use crate::find_bar::FindBar;
+use crate::https_only;
 use crate::internal_pages::{self, ListKind, Look};
 use crate::preferences::{self, PreferenceState};
 use crate::session_writer::SessionWriter;
 use crate::sidebar::Sidebar;
 use crate::suggestion_worker::SuggestionWorker;
 use crate::toolbar::{Toolbar, omnibar::Security};
-use crate::webview::tab::{Tab, TabView};
-use bitter_core::records::ZoomLevels;
+use crate::webview::context_menu::{self, MenuActions};
+use crate::webview::permissions::{self, Prompt, Request};
+use crate::webview::tab::{Engine, Tab, TabView};
+use bitter_core::config::Preferences;
+use bitter_core::records::{Permission, SiteSettings, ZoomLevels, site_origin};
 use bitter_core::session::{
     self, HOME_URI, MAX_TABS, SavedTab, SavedWorkspace, Session, WorkspaceId,
 };
@@ -16,13 +21,16 @@ use bitter_core::{bookmarks::Bookmarks, config::SearchEngine, history::History, 
 use gtk4::{gio, glib, prelude::*};
 use libadwaita as adw;
 use libadwaita::prelude::*;
-use std::cell::{Cell, RefCell};
-use std::collections::VecDeque;
+use std::cell::{Cell, OnceCell, RefCell};
+use std::collections::{HashSet, VecDeque};
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 use webkit6::prelude::*;
 
+mod hooks;
+mod site_info;
 mod suggestions;
+mod web;
 mod window_state;
 
 const MAX_CLOSED_TABS: usize = 20;
@@ -62,6 +70,12 @@ struct Browser {
     bookmarks: Bookmarks,
     preferences: PreferenceState,
     network: webkit6::NetworkSession,
+    web_settings: webkit6::Settings,
+    blocker: Rc<ContentBlocker>,
+    sites: RefCell<SiteSettings>,
+    /// Hosts the user chose to open over HTTP in HTTPS-only mode, this session.
+    insecure_allowed: Rc<RefCell<HashSet<String>>>,
+    menu_actions: OnceCell<MenuActions>,
     workspaces: RefCell<[WorkspaceTabs; 2]>,
     workspace: Cell<WorkspaceId>,
     selecting: Cell<bool>,
@@ -168,6 +182,21 @@ impl BitterWindow {
         if let Some(data) = network.website_data_manager() {
             data.set_favicons_enabled(true);
         }
+        let initial = preferences::current(&config);
+        let web_settings = webkit6::Settings::new();
+        web_settings.set_enable_webrtc(true);
+        web_settings.set_enable_media_stream(true);
+        web_settings.set_enable_back_forward_navigation_gestures(true);
+        web_settings.set_enable_developer_extras(initial.developer_tools);
+        let (sites, sites_error) =
+            SiteSettings::open(profile.data_dir().join("site-settings.json"));
+        if let Some(error) = sites_error {
+            tracing::warn!("Could not read site permissions: {error}");
+        }
+        let blocker = ContentBlocker::new(
+            &std::path::Path::new(profile.web_cache_dir()).join("content-filters"),
+            profile.data_dir().join("filter-lists"),
+        );
         let downloads = Downloads::new(
             &feedback,
             config.clone(),
@@ -194,6 +223,11 @@ impl BitterWindow {
             bookmarks,
             preferences: config,
             network,
+            web_settings,
+            blocker,
+            sites: RefCell::new(sites),
+            insecure_allowed: Default::default(),
+            menu_actions: OnceCell::new(),
             workspaces: Default::default(),
             workspace: Cell::new(restored.workspace),
             selecting: Cell::new(false),
@@ -206,6 +240,7 @@ impl BitterWindow {
             session_failed: Cell::new(false),
         });
         browser.connect(app, &window);
+        browser.apply_preferences(initial);
         for (workspace, saved) in WorkspaceId::ALL.into_iter().zip(restored.workspaces) {
             for tab in saved.tabs {
                 browser.insert(workspace, Rc::new(Tab::new(tab)), None);
@@ -293,6 +328,10 @@ impl Browser {
             ("fullscreen", &[]),
             ("toggle_sidebar", &["F9"]),
             ("preferences", &["<Control>comma"]),
+            ("print", &["<Control>p"]),
+            ("devtools", &["F12", "<Control><Shift>i"]),
+            ("clear_data", &["<Control><Shift>Delete"]),
+            ("site_permissions", &[]),
         ] {
             let action = gio::SimpleAction::new(id, None);
             let weak = Rc::downgrade(self);
@@ -376,6 +415,37 @@ impl Browser {
             }
         });
         suggestions::connect(self);
+        site_info::connect(self);
+
+        let weak = Rc::downgrade(self);
+        self.blocker.connect_changed(move || {
+            if let Some(browser) = weak.upgrade() {
+                browser.apply_filters_everywhere();
+            }
+        });
+        let open = {
+            let weak = Rc::downgrade(self);
+            move |uri: String, foreground: bool| {
+                if let Some(browser) = weak.upgrade() {
+                    browser.new_tab(browser.workspace.get(), &uri, foreground);
+                }
+            }
+        };
+        let weak = Rc::downgrade(self);
+        let search = move || {
+            if let Some(browser) = weak.upgrade() {
+                browser.search_selection();
+            }
+        };
+        let _ = self.menu_actions.set(MenuActions::new(open, search));
+        if let Some(context) = webkit6::WebContext::default() {
+            let weak = Rc::downgrade(self);
+            context.connect_initialize_notification_permissions(move |context| {
+                if let Some(browser) = weak.upgrade() {
+                    browser.sync_notification_permissions(context);
+                }
+            });
+        }
 
         if self.writer.borrow().is_some() {
             let weak = Rc::downgrade(self);
@@ -435,7 +505,7 @@ impl Browser {
             "history" => self.navigate_active("bitter://history"),
             "bookmarks" => self.navigate_active("bitter://bookmarks"),
             "bookmark_page" => self.toggle_bookmark(),
-            "settings" | "preferences" => self.show_preferences(),
+            "settings" | "preferences" => self.show_preferences_page(preferences::GENERAL),
             "downloads" => self.downloads.show(),
             "find" => {
                 if let Some(tab) = self.active() {
@@ -465,6 +535,42 @@ impl Browser {
                     tracing::warn!("Could not save the sidebar state: {error}");
                 }
             }
+            "print" => self.with_view(|_, view| {
+                let print = webkit6::PrintOperation::new(&view.web);
+                print.connect_failed(|_, error| tracing::warn!("Printing failed: {error}"));
+                print.run_dialog(self.window.upgrade().as_ref());
+            }),
+            "devtools" => {
+                if !preferences::current(&self.preferences).developer_tools {
+                    self.feedback.add_toast(
+                        adw::Toast::builder()
+                            .title("Developer tools are off")
+                            .button_label("Settings")
+                            .action_name("win.preferences")
+                            .build(),
+                    );
+                } else if let Some(inspector) = self
+                    .active()
+                    .and_then(|tab| tab.view.get().and_then(|view| view.web.inspector()))
+                {
+                    if inspector.web_view().is_some_and(|view| view.is_visible()) {
+                        inspector.close();
+                    } else {
+                        inspector.show();
+                    }
+                }
+            }
+            "clear_data" => {
+                if let Some(window) = self.window.upgrade() {
+                    let weak = Rc::downgrade(self);
+                    preferences::present_clear_data(&window, self.hooks(), move |message| {
+                        if let Some(browser) = weak.upgrade() {
+                            browser.toast(&message);
+                        }
+                    });
+                }
+            }
+            "site_permissions" => self.show_preferences_page(preferences::PERMISSIONS),
             "copy_url" => {
                 if let (Some(display), Some(tab)) = (gtk4::gdk::Display::default(), self.active()) {
                     display.clipboard().set_text(&tab.uri());
@@ -601,7 +707,7 @@ impl Browser {
         self.sidebar.tab_list().show(workspace, &tab.id);
         self.selecting.set(false);
         let view = self.materialize(&tab);
-        self.stack.set_visible_child(&view.container);
+        self.stack.set_visible_child(&view.root);
         self.display_address(&tab);
         self.refresh_view(&tab, view);
         view.web.grab_focus();
@@ -621,8 +727,9 @@ impl Browser {
             (tab, group.selected, group.tabs.is_empty(), was_active)
         };
         if let Some(view) = tab.view.get() {
+            view.permissions.dismiss();
             view.web.stop_loading();
-            self.stack.remove(&view.container);
+            self.stack.remove(&view.root);
         }
         self.selecting.set(true);
         self.sidebar.tab_list().remove(workspace, id);
@@ -742,10 +849,14 @@ impl Browser {
             .collect()
     }
 
+    fn default_zoom(&self) -> f64 {
+        f64::from(preferences::current(&self.preferences).default_zoom) / 100.0
+    }
+
     fn saved_zoom(&self, uri: &str) -> f64 {
         zoom_host(uri)
             .and_then(|host| self.zoom_levels.borrow().get(&host))
-            .unwrap_or(1.0)
+            .unwrap_or_else(|| self.default_zoom())
     }
 
     /// Steps the active tab's zoom, or resets it when `zoom_in` is `None`,
@@ -754,14 +865,20 @@ impl Browser {
         self.with_view(|tab, view| {
             let level = match zoom_in {
                 Some(zoom_in) => next_zoom(view.web.zoom_level(), zoom_in),
-                None => 1.0,
+                None => self.default_zoom(),
             };
             view.web.set_zoom_level(level);
             let host = zoom_host(&tab.uri());
-            if let Some(host) = &host
-                && let Err(error) = self.zoom_levels.borrow_mut().set(host, level)
-            {
-                tracing::warn!("Could not save the zoom level: {error}");
+            if let Some(host) = &host {
+                let mut levels = self.zoom_levels.borrow_mut();
+                // Resetting returns the site to the default zoom.
+                let result = match zoom_in {
+                    Some(_) => levels.set(host, level),
+                    None => levels.forget(host),
+                };
+                if let Err(error) = result {
+                    tracing::warn!("Could not save the zoom level: {error}");
+                }
             }
             let title = match &host {
                 Some(host) => format!("Zoom {:.0}% for {host}", level * 100.0),
@@ -802,11 +919,17 @@ impl Browser {
         self.toolbar.omnibar().select_all();
     }
 
-    fn show_preferences(&self) {
+    fn show_preferences(self: &Rc<Self>) {
+        self.show_preferences_page(preferences::GENERAL);
+    }
+
+    fn show_preferences_page(self: &Rc<Self>, page: &str) {
         if let Some(window) = self.window.upgrade()
             && window.visible_dialog().is_none()
         {
-            preferences::present(&window, &self.preferences);
+            // The pointer no longer hovers the page's links.
+            self.with_view(|_, view| view.show_link(None));
+            preferences::present(&window, &self.preferences, self.hooks(), page);
         }
     }
 
@@ -818,7 +941,7 @@ impl Browser {
         }
     }
 
-    fn navigate_active(&self, uri: &str) {
+    fn navigate_active(self: &Rc<Self>, uri: &str) {
         if uri == "bitter://settings" {
             self.with_view(|tab, _| self.display_address(tab));
             self.show_preferences();
@@ -883,17 +1006,23 @@ impl Browser {
         let weak = Rc::downgrade(self);
         let weak_tab = Rc::downgrade(tab);
         let view = tab.view.get_or_init(|| {
-            TabView::new(&self.network, move || {
-                if let Some((browser, tab)) = upgrade(&weak, &weak_tab)
-                    && let Some(view) = tab.view.get()
-                {
-                    browser.retry(&tab, view);
-                }
-            })
+            TabView::new(
+                Engine::Session(&self.network),
+                &self.web_settings,
+                move || {
+                    if let Some((browser, tab)) = upgrade(&weak, &weak_tab)
+                        && let Some(view) = tab.view.get()
+                    {
+                        browser.retry(&tab, view);
+                    }
+                },
+            )
         });
         self.connect_view(tab, view);
-        self.stack.add_child(&view.container);
-        self.navigate(tab, view, &tab.uri());
+        self.stack.add_child(&view.root);
+        let uri = tab.uri();
+        self.apply_filters(view, &uri);
+        self.navigate(tab, view, &uri);
         view
     }
 
@@ -906,15 +1035,16 @@ impl Browser {
             };
             let view = tab.view.get().expect("view attached before loading");
             match event {
-                webkit6::LoadEvent::Started => {
-                    view.loading_started();
-                    if let Some(uri) = web.uri() {
-                        *view.requested.borrow_mut() = uri.to_string();
+                webkit6::LoadEvent::Started | webkit6::LoadEvent::Redirected => {
+                    if event == webkit6::LoadEvent::Started {
+                        view.loading_started();
+                        view.permissions.dismiss();
                     }
-                }
-                webkit6::LoadEvent::Redirected => {
                     if let Some(uri) = web.uri() {
                         *view.requested.borrow_mut() = uri.to_string();
+                        if browser.main_frame_started(&tab, view, &uri) {
+                            return;
+                        }
                     }
                 }
                 webkit6::LoadEvent::Committed => {
@@ -924,6 +1054,11 @@ impl Browser {
                     }
                 }
                 webkit6::LoadEvent::Finished if !view.failed.get() => {
+                    // A cancelled load (such as the HTTP page an upgrade
+                    // replaced) also finishes; keep the upgrade pending.
+                    if !view.cancelled.get() {
+                        view.upgraded_from.replace(None);
+                    }
                     if let Some(uri) = web.uri() {
                         let title = web.title().filter(|title| !title.trim().is_empty());
                         tab.update(&uri, title.as_deref().unwrap_or(&uri));
@@ -953,6 +1088,9 @@ impl Browser {
                 view.cancelled.set(true);
                 return true;
             }
+            if browser.secure_upgrade_failed(&tab, view, uri) {
+                return true;
+            }
             if !view.failed.get() {
                 *view.requested.borrow_mut() = uri.to_owned();
                 tab.update(uri, uri);
@@ -976,6 +1114,9 @@ impl Browser {
                     return false;
                 };
                 let view = tab.view.get().expect("view attached before loading");
+                if browser.secure_upgrade_failed(&tab, view, uri) {
+                    return true;
+                }
                 *view.requested.borrow_mut() = uri.to_owned();
                 tab.update(uri, uri);
                 view.certificate_failed.set(true);
@@ -1151,12 +1292,11 @@ impl Browser {
                 decision.ignore();
                 return true;
             }
-            if kind == NewWindowAction {
-                decision.ignore();
-                return true;
-            }
+            // Script-opened windows become tabs through the `create` signal,
+            // keeping `window.opener` for sign-in and payment pop-ups.
             false
         });
+        self.connect_web_features(tab, view);
     }
 
     fn is_active(&self, tab: &Tab) -> bool {
@@ -1167,11 +1307,16 @@ impl Browser {
         let uri = tab.uri();
         let omnibar = self.toolbar.omnibar();
         omnibar.set_text(address_text(&uri));
-        let certificate_failed = tab
-            .view
-            .get()
-            .is_some_and(|view| view.certificate_failed.get());
-        omnibar.set_security(Security::for_address(&uri, certificate_failed));
+        let (certificate_failed, failed) = tab.view.get().map_or((false, false), |view| {
+            (view.certificate_failed.get(), view.failed.get())
+        });
+        // An error page shows no connection state of its own.
+        let security = if failed && !certificate_failed {
+            Security::Local
+        } else {
+            Security::for_address(&uri, certificate_failed)
+        };
+        omnibar.set_security(security);
     }
 
     fn display_active_address(&self, tab: &Tab) {

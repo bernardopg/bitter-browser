@@ -13,6 +13,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 url.workspace = true
 bitter-core = { path = "../bitter-core" }
+bitter-adblock = { path = "../bitter-adblock" }
 uuid = { version = "1.8", features = ["v4"] }
 futures-channel = "0.3"
 
