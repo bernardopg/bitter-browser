@@ -4,83 +4,74 @@ pub struct History {
     conn: Connection,
 }
 
+const MIGRATION_1: &str = "
+    CREATE TABLE IF NOT EXISTS history (
+        id INTEGER PRIMARY KEY,
+        url TEXT NOT NULL UNIQUE,
+        title TEXT,
+        visit_count INTEGER DEFAULT 1,
+        last_visit_time INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS history_recent ON history(last_visit_time DESC, id DESC);
+    CREATE VIRTUAL TABLE IF NOT EXISTS history_fts USING fts5(
+        url, title, content='history', content_rowid='id'
+    );
+    CREATE TRIGGER IF NOT EXISTS history_ai AFTER INSERT ON history BEGIN
+        INSERT INTO history_fts(rowid, url, title)
+        VALUES (new.id, new.url, new.title);
+    END;
+    CREATE TRIGGER IF NOT EXISTS history_ad AFTER DELETE ON history BEGIN
+        INSERT INTO history_fts(history_fts, rowid, url, title)
+        VALUES ('delete', old.id, old.url, old.title);
+    END;
+    CREATE TRIGGER IF NOT EXISTS history_au AFTER UPDATE ON history BEGIN
+        INSERT INTO history_fts(history_fts, rowid, url, title)
+        VALUES ('delete', old.id, old.url, old.title);
+        INSERT INTO history_fts(rowid, url, title)
+        VALUES (new.id, new.url, new.title);
+    END;
+    INSERT INTO history_fts(history_fts) VALUES ('rebuild');
+";
+
 impl History {
-    pub fn new() -> Result<Self> {
-        let mut path = crate::paths::data_dir();
-        path.push("history.sqlite");
-
-        let conn = Connection::open(path)?;
-        Self::from_connection(conn)
-    }
-
-    fn from_connection(conn: Connection) -> Result<Self> {
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS history (
-                id INTEGER PRIMARY KEY,
-                url TEXT NOT NULL UNIQUE,
-                title TEXT,
-                visit_count INTEGER DEFAULT 1,
-                last_visit_time INTEGER NOT NULL
-            )",
-            [],
+    pub fn open(data_dir: &std::path::Path) -> Result<Self, crate::DatabaseError> {
+        let conn = crate::storage::open(
+            &data_dir.join("history.sqlite"),
+            MIGRATION_1,
+            &[
+                "SELECT id, url, title, visit_count, last_visit_time FROM history LIMIT 0",
+                "SELECT url, title FROM history_fts WHERE history_fts MATCH '' LIMIT 0",
+            ],
         )?;
-
-        conn.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS history_fts USING fts5(
-                url,
-                title,
-                content='history',
-                content_rowid='id'
-            )",
-            [],
-        )?;
-
-        conn.execute_batch(
-            "CREATE TRIGGER IF NOT EXISTS history_ai AFTER INSERT ON history BEGIN
-                INSERT INTO history_fts(rowid, url, title)
-                VALUES (new.id, new.url, new.title);
-             END;
-             CREATE TRIGGER IF NOT EXISTS history_ad AFTER DELETE ON history BEGIN
-                INSERT INTO history_fts(history_fts, rowid, url, title)
-                VALUES ('delete', old.id, old.url, old.title);
-             END;
-             CREATE TRIGGER IF NOT EXISTS history_au AFTER UPDATE ON history BEGIN
-                INSERT INTO history_fts(history_fts, rowid, url, title)
-                VALUES ('delete', old.id, old.url, old.title);
-                INSERT INTO history_fts(rowid, url, title)
-                VALUES (new.id, new.url, new.title);
-             END;
-             INSERT INTO history_fts(history_fts) VALUES ('rebuild');",
-        )?;
-
         Ok(Self { conn })
     }
 
-    #[cfg(test)]
-    fn in_memory() -> Result<Self> {
-        Self::from_connection(Connection::open_in_memory()?)
+    pub fn open_for_search(data_dir: &std::path::Path) -> Result<Self> {
+        let conn = crate::storage::open_read_only(&data_dir.join("history.sqlite"))?;
+        Ok(Self { conn })
     }
 
     pub fn add_visit(&self, url: &str, title: Option<&str>) -> Result<()> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = crate::storage::unix_seconds();
 
-        self.conn.execute(
-            "INSERT INTO history (url, title, last_visit_time)
+        self.conn
+            .prepare_cached(
+                "INSERT INTO history (url, title, last_visit_time)
              VALUES (?1, ?2, ?3)
              ON CONFLICT(url) DO UPDATE SET
                 title = COALESCE(excluded.title, history.title),
-                visit_count = CASE
-                    WHEN excluded.last_visit_time > history.last_visit_time
-                    THEN history.visit_count + 1
-                    ELSE history.visit_count
-                END,
+                visit_count = history.visit_count + 1,
                 last_visit_time = MAX(history.last_visit_time, excluded.last_visit_time)",
-            rusqlite::params![url, title, now],
-        )?;
+            )?
+            .execute(rusqlite::params![url, title, now])?;
 
+        Ok(())
+    }
+
+    pub fn update_title(&self, url: &str, title: &str) -> Result<()> {
+        self.conn
+            .prepare_cached("UPDATE history SET title = ?2 WHERE url = ?1 AND title IS NOT ?2")?
+            .execute(rusqlite::params![url, title])?;
         Ok(())
     }
 
@@ -89,14 +80,17 @@ impl History {
             return self.recent(10);
         };
 
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare_cached(
             "SELECT url, title FROM history_fts
              WHERE history_fts MATCH ?1
              ORDER BY rank LIMIT 10",
         )?;
 
         let history_iter = stmt.query_map([match_query], |row| {
-            Ok((row.get(0)?, row.get(1).unwrap_or_default()))
+            Ok((
+                row.get(0)?,
+                row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+            ))
         })?;
 
         let mut results = Vec::new();
@@ -111,12 +105,15 @@ impl History {
         let mut stmt = self.conn.prepare(
             "SELECT url, title
              FROM history
-             ORDER BY last_visit_time DESC
+             ORDER BY last_visit_time DESC, id DESC
              LIMIT ?1",
         )?;
 
         let history_iter = stmt.query_map([limit as i64], |row| {
-            Ok((row.get(0)?, row.get(1).unwrap_or_default()))
+            Ok((
+                row.get(0)?,
+                row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+            ))
         })?;
 
         let mut results = Vec::new();
@@ -133,10 +130,17 @@ fn history_fts_query(query: &str) -> Option<String> {
         .split(|ch: char| !ch.is_alphanumeric())
         .filter(|term| !term.is_empty())
         .take(8)
-        .map(|term| format!("\"{}\"", term.replace('"', "\"\"")))
+        .map(|term| format!("\"{term}\""))
         .collect::<Vec<_>>();
 
-    (!terms.is_empty()).then(|| terms.join(" "))
+    let mut prefix = terms.join(" ");
+    if prefix.is_empty() {
+        return None;
+    }
+    if query.chars().last().is_some_and(char::is_alphanumeric) {
+        prefix.push('*');
+    }
+    Some(prefix)
 }
 
 #[cfg(test)]
@@ -145,7 +149,8 @@ mod tests {
 
     #[test]
     fn search_accepts_url_like_input() {
-        let history = History::in_memory().expect("history database");
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::open(dir.path()).expect("history database");
         history
             .add_visit(
                 "https://duckduckgo.com/?q=rust+browser",
@@ -162,10 +167,68 @@ mod tests {
     }
 
     #[test]
+    fn imports_legacy_history_and_keeps_search_index_current_after_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("history.sqlite");
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE history (id INTEGER PRIMARY KEY, url TEXT NOT NULL UNIQUE, title TEXT,
+                                   visit_count INTEGER DEFAULT 1, last_visit_time INTEGER NOT NULL);
+             INSERT INTO history VALUES (17, 'https://example.test', 'Legacy title', 4, 100);",
+        )
+        .unwrap();
+        drop(conn);
+
+        let history = History::open(dir.path()).unwrap();
+        assert_eq!(history.search("Legacy").unwrap().len(), 1);
+        history
+            .add_visit("https://example.test", Some("Updated title"))
+            .unwrap();
+        drop(history);
+
+        let history = History::open(dir.path()).unwrap();
+        assert!(history.search("Legacy").unwrap().is_empty());
+        assert_eq!(
+            history.search("Updated").unwrap()[0].0,
+            "https://example.test"
+        );
+        let record: (i64, i64, i64) = history
+            .conn
+            .query_row(
+                "SELECT id, visit_count, last_visit_time FROM history",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!((record.0, record.1), (17, 5));
+        assert!(record.2 >= 100);
+    }
+
+    #[test]
+    fn matches_a_partial_last_word_and_updates_title_without_another_visit() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::open(dir.path()).unwrap();
+        history.add_visit("https://example.test", None).unwrap();
+        history
+            .update_title("https://example.test", "Local Landing")
+            .unwrap();
+        assert_eq!(history.search("Local Lan").unwrap()[0].1, "Local Landing");
+        assert!(history.search("Local Lan ").unwrap().is_empty());
+        assert_eq!(
+            history
+                .conn
+                .query_row("SELECT visit_count FROM history", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+    }
+
+    #[test]
     fn fts_query_escapes_punctuation_syntax() {
         assert_eq!(
             history_fts_query("https://example.com/path?q=rust-browser"),
-            Some("\"https\" \"example\" \"com\" \"path\" \"q\" \"rust\" \"browser\"".to_string())
+            Some("\"https\" \"example\" \"com\" \"path\" \"q\" \"rust\" \"browser\"*".to_string())
         );
     }
 }

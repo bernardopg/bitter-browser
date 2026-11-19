@@ -1,136 +1,95 @@
 use crate::sidebar::tab_item::TabItem;
+use bitter_core::session::WorkspaceId;
 use gtk4::prelude::*;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Clone)]
 pub struct TabList {
-    list_box: gtk4::ListBox,
-    items: Rc<RefCell<Vec<TabItem>>>,
-    on_tab_closed: Rc<RefCell<Option<Rc<dyn Fn(&str)>>>>,
-    active_workspace_id: Rc<RefCell<String>>,
+    stack: gtk4::Stack,
+    lists: [gtk4::ListBox; 2],
+    items: RefCell<HashMap<String, TabItem>>,
 }
 
 impl TabList {
     pub fn new() -> Self {
-        let list_box = gtk4::ListBox::builder()
-            .selection_mode(gtk4::SelectionMode::Single)
-            .css_classes(vec!["tab-list"])
-            .build();
-
-        let active_workspace_id = Rc::new(RefCell::new("default".to_string()));
-
-        let items: Rc<RefCell<Vec<TabItem>>> = Rc::new(RefCell::new(Vec::new()));
-
-        let items_clone = items.clone();
-        let active_workspace_id_clone = active_workspace_id.clone();
-
-        list_box.set_filter_func(move |row| {
-            let items = items_clone.borrow();
-            if let Some(item) = items
-                .iter()
-                .find(|item| item.widget() == row.upcast_ref::<gtk4::Widget>())
-            {
-                item.workspace_id() == *active_workspace_id_clone.borrow()
-            } else {
-                false
-            }
+        let stack = gtk4::Stack::new();
+        let lists = WorkspaceId::ALL.map(|workspace| {
+            let list = gtk4::ListBox::builder().css_classes(["tab-list"]).build();
+            stack.add_named(&list, Some(Self::name(workspace)));
+            list
         });
-
         Self {
-            list_box,
-            items,
-            on_tab_closed: Rc::new(RefCell::new(None)),
-            active_workspace_id,
+            stack,
+            lists,
+            items: RefCell::new(HashMap::new()),
+        }
+    }
+
+    fn name(workspace: WorkspaceId) -> &'static str {
+        match workspace {
+            WorkspaceId::Main => "main",
+            WorkspaceId::Second => "second",
         }
     }
 
     pub fn widget(&self) -> &gtk4::Widget {
-        self.list_box.upcast_ref()
+        self.stack.upcast_ref()
     }
 
-    pub fn add_tab(&self, id: &str, title: &str, workspace_id: &str) {
-        let item = TabItem::new(id, title, workspace_id);
+    pub fn insert(
+        &self,
+        id: &str,
+        title: &str,
+        workspace: WorkspaceId,
+        index: usize,
+        close: impl Fn(&str) + 'static,
+    ) {
+        let item = TabItem::new(id, title);
+        item.connect_close_clicked(close);
+        self.lists[workspace.index()].insert(item.row(), index as i32);
+        self.items.borrow_mut().insert(id.to_owned(), item);
+    }
 
-        if let Some(cb) = self.on_tab_closed.borrow().as_ref() {
-            let cb = cb.clone();
-            item.connect_close_clicked(move |id| {
-                cb(id);
+    pub fn remove(&self, workspace: WorkspaceId, id: &str) {
+        let item = self.items.borrow_mut().remove(id);
+        if let Some(item) = item {
+            self.lists[workspace.index()].remove(item.row());
+        }
+    }
+
+    pub fn move_to(&self, workspace: WorkspaceId, id: &str, index: usize) {
+        let row = self.items.borrow().get(id).map(|item| item.row().clone());
+        if let Some(row) = row {
+            let list = &self.lists[workspace.index()];
+            list.remove(&row);
+            list.insert(&row, index as i32);
+        }
+    }
+
+    pub fn show(&self, workspace: WorkspaceId, id: &str) {
+        let row = self.items.borrow().get(id).map(|item| item.row().clone());
+        self.stack.set_visible_child_name(Self::name(workspace));
+        if let Some(row) = row {
+            self.lists[workspace.index()].select_row(Some(&row));
+        }
+    }
+
+    pub fn update(&self, id: &str, title: &str, loading: bool) {
+        if let Some(item) = self.items.borrow().get(id) {
+            item.update(title, loading);
+        }
+    }
+
+    pub fn connect_selected(&self, callback: impl Fn(&str) + 'static) {
+        let callback = Rc::new(callback);
+        for list in &self.lists {
+            let callback = callback.clone();
+            list.connect_row_selected(move |_, row| {
+                if let Some(row) = row {
+                    callback(&row.widget_name());
+                }
             });
         }
-
-        self.list_box.append(item.widget());
-        {
-            self.items.borrow_mut().push(item);
-        }
-        self.list_box.invalidate_filter();
-    }
-
-    pub fn remove_tab(&self, id: &str) {
-        let item = {
-            let mut items = self.items.borrow_mut();
-            items
-                .iter()
-                .position(|item| item.id() == id)
-                .map(|index| items.remove(index))
-        };
-
-        if let Some(item) = item {
-            self.list_box.remove(item.widget());
-        }
-
-        self.list_box.invalidate_filter();
-    }
-
-    pub fn set_active_workspace(&self, workspace_id: &str) {
-        {
-            *self.active_workspace_id.borrow_mut() = workspace_id.to_string();
-        }
-        self.list_box.invalidate_filter();
-    }
-
-    pub fn active_workspace(&self) -> String {
-        self.active_workspace_id.borrow().clone()
-    }
-
-    pub fn first_tab_in_workspace(&self, workspace_id: &str) -> Option<String> {
-        let items = self.items.borrow();
-        items
-            .iter()
-            .find(|item| item.workspace_id() == workspace_id)
-            .map(|item| item.id().to_string())
-    }
-
-    pub fn set_tab_title(&self, id: &str, title: &str) {
-        let items = self.items.borrow();
-        if let Some(item) = items.iter().find(|item| item.id() == id) {
-            item.set_title(title);
-        }
-    }
-
-    pub fn select_tab(&self, id: &str) {
-        let items = self.items.borrow();
-        if let Some(item) = items.iter().find(|item| item.id() == id) {
-            self.list_box.select_row(Some(item.row()));
-        }
-    }
-
-    pub fn connect_tab_selected<F: Fn(&str) + 'static>(&self, f: F) {
-        let items = self.items.clone();
-        self.list_box.connect_row_selected(move |_, row| {
-            if let Some(row) = row {
-                let items = items.borrow();
-                if let Some(item) = items
-                    .iter()
-                    .find(|item| item.widget() == row.upcast_ref::<gtk4::Widget>())
-                {
-                    f(item.id());
-                }
-            }
-        });
-    }
-
-    pub fn connect_tab_closed<F: Fn(&str) + 'static>(&self, f: F) {
-        *self.on_tab_closed.borrow_mut() = Some(Rc::new(f));
     }
 }

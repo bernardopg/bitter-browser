@@ -56,3 +56,6 @@
 *.obj
 .DS_Store
 Thumbs.db
+
+# Python bytecode from helper scripts
+__pycache__/

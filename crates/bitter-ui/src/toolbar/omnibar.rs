@@ -1,19 +1,29 @@
 use gtk4::prelude::*;
+use std::{cell::Cell, rc::Rc};
 
 #[derive(Clone)]
 pub struct Omnibar {
     entry: gtk4::Entry,
+    updating: Rc<Cell<bool>>,
+    editing: Rc<Cell<bool>>,
 }
 
 impl Omnibar {
     pub fn new() -> Self {
         let entry = gtk4::Entry::builder()
             .placeholder_text("Search or enter address")
-            .width_request(400)
+            .width_chars(24)
+            .max_width_chars(45)
+            .hexpand(true)
             .css_classes(vec!["omnibar"])
             .build();
 
-        Self { entry }
+        entry.update_property(&[gtk4::accessible::Property::Label("Address and search")]);
+        Self {
+            entry,
+            updating: Rc::new(Cell::new(false)),
+            editing: Rc::new(Cell::new(false)),
+        }
     }
 
     pub fn widget(&self) -> &gtk4::Widget {
@@ -21,7 +31,20 @@ impl Omnibar {
     }
 
     pub fn set_text(&self, text: &str) {
-        self.entry.set_text(text);
+        self.editing.set(false);
+        if self.entry.text() != text {
+            self.updating.set(true);
+            self.entry.set_text(text);
+            self.updating.set(false);
+        }
+    }
+
+    pub fn editing(&self) -> bool {
+        self.editing.get()
+    }
+
+    pub fn text(&self) -> gtk4::glib::GString {
+        self.entry.text()
     }
 
     pub fn grab_focus(&self) {
@@ -39,8 +62,13 @@ impl Omnibar {
     }
 
     pub fn connect_changed<F: Fn(String) + 'static>(&self, f: F) {
+        let updating = self.updating.clone();
+        let editing = self.editing.clone();
         self.entry.connect_changed(move |entry| {
-            f(entry.text().to_string());
+            if !updating.get() {
+                editing.set(true);
+                f(entry.text().to_string());
+            }
         });
     }
 
@@ -60,6 +88,7 @@ impl Omnibar {
     ) {
         let key_controller = gtk4::EventControllerKey::new();
         key_controller.connect_key_pressed(move |_, keyval, _, state| f(keyval, state));
+        key_controller.set_propagation_phase(gtk4::PropagationPhase::Capture);
         self.entry.add_controller(key_controller);
     }
 }

@@ -21,7 +21,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install native dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libwebkitgtk-6.0-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libwebkitgtk-6.0-dev dbus xvfb xauth xdotool
       - name: Install Rust components
         run: rustup update stable && rustup default stable && rustup component add rustfmt clippy llvm-tools-preview
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
@@ -39,6 +39,16 @@ jobs:
         run: cargo audit
       - name: Test and collect coverage
         run: cargo llvm-cov --workspace --all-targets --locked --lcov --output-path lcov.info
+      - name: Test native preferences
+        env:
+          GTK_A11Y: none
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+        run: xvfb-run -a dbus-run-session -- cargo test -p bitter-ui --locked settings_widgets_save_restore_and_report_errors -- --ignored
+      - name: Smoke test browsing and session recovery
+        run: |
+          cargo build -p bitter-ui --locked
+          xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- timeout 180s python3 scripts/daily-smoke.py target/debug/bitter-ui
       - name: Upload coverage
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

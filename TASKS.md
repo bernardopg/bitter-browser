@@ -4,10 +4,19 @@ This is the tracked roadmap for bringing the current experimental Linux browser 
 
 ## Current baseline and decisions
 
-- GTK 4/libadwaita and WebKitGTK 6 provide an experimental window, tabs, an omnibar and SQLite-backed history/bookmarks. `crates/bitter-ui/src/window.rs` also renders internal HTML pages; the settings page currently says it is not implemented.
-- `bitter-adblock`, `bitter-net` and `bitter-devtools` are scaffolds; the CLI currently prints a placeholder. Configuration declares privacy options but their presence is not evidence of enforcement. See `crates/bitter-core/src/config.rs` and `crates/bitter-ui/src/webview/tab.rs`.
+- GTK 4/libadwaita and WebKitGTK 6 provide an experimental window, tabs, an omnibar and SQLite-backed history/bookmarks. `crates/bitter-ui/src/window.rs` renders internal HTML pages and opens native preferences through the window action.
+- `bitter-adblock`, `bitter-net` and `bitter-devtools` are scaffolds; the CLI currently prints a placeholder. Native preferences mark ad and tracker blocking and HTTPS-only mode as unavailable.
 - CI generates workspace-wide coverage, but the last local measurement at the time this roadmap was written was 6.79% of instrumented lines; GUI and real-web behavior were not exercised. Re-measure on the target commit rather than treating this number as permanent.
 - Scope is initially Linux x86-64, Wayland/X11 and the documented Flatpak/Arch paths. Product owners must decide minimum supported environments and optional features before promising them. No production-readiness or security audit is implied.
+
+The local implementation of DATA-01, DATA-02, DATA-03 and UI-05 is documented
+in [Profiles and local data](docs/profile.md), including verification commands.
+The checklist follows the linked-evidence rule above.
+
+The daily browsing tranche covers local session restore (DATA-04),
+tab and workspace lifecycle (UI-02), navigation feedback (UI-01), and
+asynchronous local address suggestions (UI-01 / TEST-06).
+See [Daily browsing](docs/daily-browsing.md) for scope and verification.
 
 ## P0 — Define the product and release gates
 

@@ -3,14 +3,16 @@ use gtk4::prelude::*;
 pub struct TabItem {
     row: gtk4::ListBoxRow,
     id: String,
-    workspace_id: String,
+    icon: gtk4::Image,
+    spinner: gtk4::Spinner,
     close_button: gtk4::Button,
     label: gtk4::Label,
 }
 
 impl TabItem {
-    pub fn new(id: &str, title: &str, workspace_id: &str) -> Self {
+    pub fn new(id: &str, title: &str) -> Self {
         let row = gtk4::ListBoxRow::builder()
+            .name(id)
             .css_classes(vec!["tab-item"])
             .build();
 
@@ -32,6 +34,7 @@ impl TabItem {
             .label(title)
             .ellipsize(gtk4::pango::EllipsizeMode::End)
             .xalign(0.0)
+            .max_width_chars(20)
             .hexpand(true)
             .build();
 
@@ -41,7 +44,10 @@ impl TabItem {
             .valign(gtk4::Align::Center)
             .build();
 
+        let spinner = gtk4::Spinner::new();
+        spinner.set_visible(false);
         box_container.append(&favicon);
+        box_container.append(&spinner);
         box_container.append(&label);
         box_container.append(&close_button);
         row.set_child(Some(&box_container));
@@ -49,30 +55,25 @@ impl TabItem {
         Self {
             row,
             id: id.to_string(),
-            workspace_id: workspace_id.to_string(),
+            icon: favicon,
+            spinner,
             close_button,
             label,
         }
-    }
-
-    pub fn widget(&self) -> &gtk4::Widget {
-        self.row.upcast_ref()
     }
 
     pub fn row(&self) -> &gtk4::ListBoxRow {
         &self.row
     }
 
-    pub fn id(&self) -> &str {
-        &self.id
-    }
-
-    pub fn workspace_id(&self) -> &str {
-        &self.workspace_id
-    }
-
-    pub fn set_title(&self, title: &str) {
+    pub fn update(&self, title: &str, loading: bool) {
         self.label.set_label(title);
+        self.row.set_tooltip_text(Some(title));
+        self.close_button
+            .set_tooltip_text(Some(&format!("Close {title}")));
+        self.icon.set_visible(!loading);
+        self.spinner.set_visible(loading);
+        self.spinner.set_spinning(loading);
     }
 
     pub fn connect_close_clicked<F: Fn(&str) + 'static>(&self, f: F) {

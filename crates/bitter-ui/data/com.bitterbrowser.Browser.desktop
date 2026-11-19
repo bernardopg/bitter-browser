@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Bitter Browser
-Comment=The browser that bites back — fast, sharp, and precise.
+Comment=Focused, native web browser for the Linux desktop
 Exec=bitter-ui %U
 Icon=com.bitterbrowser.Browser
 Type=Application
