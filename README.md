@@ -42,7 +42,9 @@ workspaces, and the interface follows the GNOME design language.
 | **Session restore** | Reopens your tabs after a normal exit or a crash, and loads only the selected tab at startup. |
 | **Smart address bar** | Suggestions from local history, bookmarks and open tabs, queried off the UI thread. |
 | **Navigation feedback** | Loading progress, Stop, and native error pages with *Try Again*. |
-| **Tab control** | Reopen closed tabs, reorder from the keyboard, open links in the background. |
+| **Tab control** | Reopen closed tabs, reorder from the keyboard, open links in the background, site icons. |
+| **Downloads** | Saved to your downloads folder under safe, unique names, with progress, cancel and open. |
+| **Page tools** | Find in page, per-tab zoom and full screen for the browser, videos and pages. |
 | **Desktop integration** | Opens links from other applications in the running window. |
 | **Native preferences** | Search provider, color scheme and startup behavior, saved immediately and atomically. |
 | **Local data** | SQLite history and bookmarks with versioned migrations and a locked XDG profile. |
@@ -94,6 +96,9 @@ makepkg -si
 | Move tab | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>←</kbd> · <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd> |
 | Address bar · command palette | <kbd>Ctrl</kbd>+<kbd>L</kbd> · <kbd>Ctrl</kbd>+<kbd>K</kbd> |
 | Back · forward · reload | <kbd>Alt</kbd>+<kbd>←</kbd> · <kbd>Alt</kbd>+<kbd>→</kbd> · <kbd>Ctrl</kbd>+<kbd>R</kbd> |
+| Find · next · previous | <kbd>Ctrl</kbd>+<kbd>F</kbd> · <kbd>Ctrl</kbd>+<kbd>G</kbd> · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> |
+| Zoom in · out · reset | <kbd>Ctrl</kbd>+<kbd>+</kbd> · <kbd>Ctrl</kbd>+<kbd>-</kbd> · <kbd>Ctrl</kbd>+<kbd>0</kbd> |
+| Full screen · downloads | <kbd>F11</kbd> · <kbd>Ctrl</kbd>+<kbd>J</kbd> |
 | History · bookmarks · bookmark page | <kbd>Ctrl</kbd>+<kbd>H</kbd> · <kbd>Ctrl</kbd>+<kbd>B</kbd> · <kbd>Ctrl</kbd>+<kbd>D</kbd> |
 | Preferences · quit | <kbd>Ctrl</kbd>+<kbd>,</kbd> · <kbd>Ctrl</kbd>+<kbd>Q</kbd> |
 
