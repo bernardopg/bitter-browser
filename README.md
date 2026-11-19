@@ -62,29 +62,36 @@ workspaces, and the interface follows the GNOME design language.
 
 ## Install
 
-### Flatpak
+Every [release](https://github.com/bernardopg/bitter-browser/releases/latest)
+ships a Flatpak bundle, a source archive, an Arch `PKGBUILD`, an SPDX SBOM and
+a checksum file. All assets carry GitHub build provenance attestations.
 
-Download the x86-64 bundle from the
-[latest release](https://github.com/bernardopg/bitter-browser/releases/latest)
-and verify it against the published `sha256.txt` file. Then install the GNOME
-runtime and the bundle:
+### Flatpak
 
 ```sh
 flatpak install --user flathub org.gnome.Platform//51
-flatpak install --user ./bitter-browser-0.1.1-x86_64.flatpak
+flatpak install --user ./bitter-browser-0.2.0-x86_64.flatpak
 flatpak run com.bitterbrowser.Browser
 ```
 
-The file name changes with each release.
-
 ### Arch Linux
 
-The repository ships a `PKGBUILD` that builds the latest commit:
+Build the release package from the `PKGBUILD` attached to the release:
 
 ```sh
-git clone https://github.com/bernardopg/bitter-browser.git
-cd bitter-browser
+mkdir bitter-browser && cd bitter-browser
+curl -LO https://github.com/bernardopg/bitter-browser/releases/latest/download/PKGBUILD
 makepkg -si
+```
+
+For the latest commit, run `makepkg -si` with the `PKGBUILD` at the
+repository root, which builds `bitter-browser-git`.
+
+### Verify a download
+
+```sh
+sha256sum -c --ignore-missing bitter-browser-0.2.0-sha256.txt
+gh attestation verify bitter-browser-0.2.0-x86_64.flatpak --repo bernardopg/bitter-browser
 ```
 
 ## Keyboard shortcuts
