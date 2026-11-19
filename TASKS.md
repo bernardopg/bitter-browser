@@ -23,6 +23,13 @@ upload or portal destination selection yet), find in page, zoom, full screen,
 window size persistence and site icons (UI-01 / UI-02), and the `--version`
 and `--help` options of the command-line contract (CLI-01).
 
+The packaging tranche makes the Flatpak build offline from vendored crates,
+adds a release and a development Arch `PKGBUILD` (OPS-01), and publishes
+releases from protected, signed tags with checksums, an SPDX SBOM and build
+provenance attestations (OPS-02). See [CI and releases](docs/ci-release.md).
+v0.2.1 was installed from its release assets with pacman and Flatpak and used
+on a Hyprland Wayland session.
+
 ## P0 — Define the product and release gates
 
 - [ ] **PRD-01 — Product contract.** Decide target users, supported Linux distributions/architectures, display servers, WebKitGTK minimum and update policy, accessibility targets, privacy defaults, and explicitly unsupported features. Publish a versioned support matrix and release criteria. Depends: none.
