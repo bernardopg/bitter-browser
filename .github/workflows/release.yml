@@ -84,3 +84,18 @@ jobs:
           PY
           gh release create "$TAG" dist/* --verify-tag --title "Bitter Browser $VERSION" \
             --notes-file notes.md
+      - name: Verify the published assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir published
+          cd published
+          gh release download "$TAG"
+          sha256sum -c "bitter-browser-$VERSION-sha256.txt"
+          # The PKGBUILD must fetch exactly the archive its checksum describes.
+          source_url=$(bash -c 'source ./PKGBUILD && printf "%s" "${source[0]}"')
+          expected=$(bash -c 'source ./PKGBUILD && printf "%s" "${sha256sums[0]}"')
+          case "$source_url" in *::*) source_url=${source_url#*::} ;; esac
+          curl -fsSL "$source_url" -o source.tar.gz
+          echo "$expected  source.tar.gz" | sha256sum -c

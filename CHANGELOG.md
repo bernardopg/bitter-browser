@@ -5,6 +5,16 @@ All notable changes to Bitter Browser are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-11-19
+
+### Fixed
+
+- The Arch `PKGBUILD` attached to the release downloaded GitHub's generated
+  archive, whose checksum differs from the published source archive, so
+  `makepkg` rejected it. It now downloads the release asset, and the release
+  workflow verifies every published asset and the `PKGBUILD` source after
+  publishing.
+
 ## [0.2.0] - 2026-11-19
 
 ### Added
@@ -53,5 +63,6 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 - Meson installation of the executable and the application icon.
 
+[0.2.1]: https://github.com/bernardopg/bitter-browser/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/bernardopg/bitter-browser/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/bernardopg/bitter-browser/releases/tag/v0.1.1

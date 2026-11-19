@@ -1,7 +1,7 @@
 # Maintainer: Bitter Browser Contributors <https://github.com/bernardopg/bitter-browser>
 # Release package: builds the tagged source archive.
 pkgname=bitter-browser
-pkgver=0.2.0
+pkgver=0.2.1
 pkgrel=1
 pkgdesc='Focused, native web browser for the Linux desktop'
 arch=('x86_64')
@@ -11,7 +11,8 @@ depends=('dconf' 'glib2' 'glibc' 'gtk4' 'hicolor-icon-theme' 'libadwaita' 'libgc
 makedepends=('cargo' 'meson')
 # The bundled SQLite is C; makepkg LTO turns it into GCC bitcode that the Rust linker cannot read.
 options=('!lto')
-source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+# The release asset, not GitHub's generated archive, whose checksum is not stable.
+source=("$url/releases/download/v$pkgver/$pkgname-$pkgver.tar.gz")
 sha256sums=('SKIP')
 
 prepare() {
