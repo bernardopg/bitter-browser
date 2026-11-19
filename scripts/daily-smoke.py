@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Drive the native GTK/WebKit browser against a loopback HTTP fixture."""
 import argparse
+import ctypes
+import ctypes.util
 import json
 import os
 import re
@@ -38,6 +40,18 @@ setInterval(() => {
   if (state !== last) { last = state; fetch("/report?" + encodeURIComponent(state)).catch(() => {}); }
 }, 50);
 </script>"""
+
+
+XLIB = ctypes.CDLL(ctypes.util.find_library("X11"))
+XTST = ctypes.CDLL(ctypes.util.find_library("Xtst"))
+XLIB.XOpenDisplay.restype = ctypes.c_void_p
+XLIB.XOpenDisplay.argtypes = [ctypes.c_char_p]
+XLIB.XKeysymToKeycode.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+XLIB.XKeysymToKeycode.restype = ctypes.c_ubyte
+XLIB.XFlush.argtypes = [ctypes.c_void_p]
+XLIB.XCloseDisplay.argtypes = [ctypes.c_void_p]
+XTST.XTestFakeKeyEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int, ctypes.c_ulong]
+F11 = 0xFFC8
 
 
 def eventually(check, message, timeout=12):
@@ -191,6 +205,23 @@ class Browser:
 
     def key(self, *keys):
         self.xdotool("key", "--clearmodifiers", *keys)
+
+    def plain_key(self, keysym):
+        """Press a key without modifiers through XTest.
+
+        Some xdotool builds pick a key level that needs Alt, so `xdotool key
+        F11` arrives as Alt+F11 on Ubuntu's Xvfb.
+        """
+        display = XLIB.XOpenDisplay(None)
+        assert display, "Cannot open the X display"
+        try:
+            keycode = XLIB.XKeysymToKeycode(display, keysym)
+            assert keycode, f"No keycode for keysym {keysym:#x}"
+            for pressed in (True, False):
+                XTST.XTestFakeKeyEvent(display, keycode, pressed, 0)
+            XLIB.XFlush(display)
+        finally:
+            XLIB.XCloseDisplay(display)
 
     def click(self, x, y, modifiers=None):
         values = ("mousemove", "--window", self.window, str(x), str(y), "click", "1")
@@ -437,7 +468,8 @@ def run_flow(browser, base):
     step(keys("ctrl+plus", "ctrl+plus"), lambda r: r[1] < width * 0.85,
          "Zoom in did not enlarge the page")
     step(keys("ctrl+0"), lambda r: r[1] == width, "Zoom reset did not restore the page")
-    step(keys("F11"), lambda r: r[1] > width + 150, "Full screen did not hide the browser chrome")
+    step(lambda: browser.plain_key(F11), lambda r: r[1] > width + 150,
+         "Full screen did not hide the browser chrome")
     step(keys("Escape"), lambda r: r[1] == width, "Leaving full screen did not restore the chrome")
     step(lambda: browser.click(270, 187), lambda r: r[2], "The page could not enter full screen")
     step(keys("Escape"), lambda r: not r[2] and r[1] == width, "The page did not leave full screen")
