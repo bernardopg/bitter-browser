@@ -6,8 +6,3 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-tokio.workspace = true
-hickory-resolver.workspace = true
-reqwest.workspace = true
-url.workspace = true
-tracing.workspace = true

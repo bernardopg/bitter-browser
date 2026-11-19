@@ -6,6 +6,3 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-adblock.workspace = true
-url.workspace = true
-tracing.workspace = true
