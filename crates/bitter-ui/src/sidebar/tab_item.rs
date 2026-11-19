@@ -1,5 +1,7 @@
 use gtk4::prelude::*;
 
+const FALLBACK_ICON: &str = "web-browser-symbolic";
+
 pub struct TabItem {
     row: gtk4::ListBoxRow,
     id: String,
@@ -26,7 +28,7 @@ impl TabItem {
             .build();
 
         let favicon = gtk4::Image::builder()
-            .icon_name("text-html-symbolic")
+            .icon_name(FALLBACK_ICON)
             .pixel_size(16)
             .build();
 
@@ -74,6 +76,14 @@ impl TabItem {
         self.icon.set_visible(!loading);
         self.spinner.set_visible(loading);
         self.spinner.set_spinning(loading);
+    }
+
+    /// Shows the site icon, or the generic page icon when there is none.
+    pub fn set_favicon(&self, favicon: Option<&gtk4::gdk::Texture>) {
+        match favicon {
+            Some(texture) => self.icon.set_paintable(Some(texture)),
+            None => self.icon.set_icon_name(Some(FALLBACK_ICON)),
+        }
     }
 
     pub fn connect_close_clicked<F: Fn(&str) + 'static>(&self, f: F) {

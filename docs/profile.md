@@ -11,6 +11,8 @@ when the respective variable is unset.
 | `$XDG_DATA_HOME/bitter-browser/` | `history.sqlite`, `bookmarks.sqlite` and `session.json` |
 | `$XDG_DATA_HOME/bitter-ui/` | Persistent WebKit website data |
 | `$XDG_CACHE_HOME/bitter-ui/` | WebKit cache |
+| GSettings `com.bitterbrowser.Browser` | Window size and maximized state |
+| XDG download directory | Downloaded files |
 
 The WebKit directory names match earlier releases, keeping existing website
 data available. The browser restricts these directories to their owner

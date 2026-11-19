@@ -18,6 +18,8 @@
       <li>Session restore that loads only the selected tab at startup</li>
       <li>Address bar suggestions from local history, bookmarks and open tabs</li>
       <li>Native error pages with retry for connection and certificate failures</li>
+      <li>Downloads with safe file names, progress and cancel</li>
+      <li>Find in page, zoom and full screen</li>
       <li>Light, dark and system color schemes</li>
     </ul>
     <p>

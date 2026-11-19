@@ -7,6 +7,7 @@ use std::cell::Cell;
 
 pub struct Toolbar {
     container: gtk4::Box,
+    header: adw::HeaderBar,
     omnibar: omnibar::Omnibar,
     actions: actions::Actions,
     progress: gtk4::ProgressBar,
@@ -40,6 +41,7 @@ impl Toolbar {
 
         Self {
             container,
+            header,
             omnibar,
             actions,
             progress,
@@ -49,6 +51,11 @@ impl Toolbar {
 
     pub fn widget(&self) -> &gtk4::Widget {
         self.container.upcast_ref()
+    }
+
+    /// Adds a widget to the end of the header bar, left of earlier ones.
+    pub fn pack_end(&self, widget: &impl IsA<gtk4::Widget>) {
+        self.header.pack_end(widget);
     }
 
     pub fn omnibar(&self) -> &omnibar::Omnibar {

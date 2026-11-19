@@ -18,6 +18,11 @@ tab and workspace lifecycle (UI-02), navigation feedback (UI-01), and
 asynchronous local address suggestions (UI-01 / TEST-06).
 See [Daily browsing](docs/daily-browsing.md) for scope and verification.
 
+The daily tools tranche adds local downloads with safe naming (UI-03, without
+upload or portal destination selection yet), find in page, zoom, full screen,
+window size persistence and site icons (UI-01 / UI-02), and the `--version`
+and `--help` options of the command-line contract (CLI-01).
+
 ## P0 — Define the product and release gates
 
 - [ ] **PRD-01 — Product contract.** Decide target users, supported Linux distributions/architectures, display servers, WebKitGTK minimum and update policy, accessibility targets, privacy defaults, and explicitly unsupported features. Publish a versioned support matrix and release criteria. Depends: none.

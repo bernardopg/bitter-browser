@@ -18,6 +18,25 @@ impl BitterApp {
             .flags(gio::ApplicationFlags::HANDLES_OPEN)
             .build();
         let startup_failed = Rc::new(Cell::new(false));
+        app.add_main_option(
+            "version",
+            glib::Char::from(b'v'),
+            glib::OptionFlags::NONE,
+            glib::OptionArg::None,
+            "Show the version and exit",
+            None,
+        );
+        app.set_option_context_parameter_string(Some("[URL…]"));
+        app.set_option_context_summary(Some(
+            "Open web addresses in Bitter Browser. Addresses go to the running window when there is one.",
+        ));
+        app.connect_handle_local_options(|_, options| {
+            if options.contains("version") {
+                println!("Bitter Browser {}", env!("CARGO_PKG_VERSION"));
+                return std::ops::ControlFlow::Break(glib::ExitCode::SUCCESS);
+            }
+            std::ops::ControlFlow::Continue(())
+        });
 
         app.connect_startup(|_| crate::style::load());
         app.set_accels_for_action("win.preferences", &["<Control>comma"]);
