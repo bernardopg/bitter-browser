@@ -605,3 +605,14 @@ impl Row {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::download_directory;
+
+    #[test]
+    fn download_directory_is_absolute() {
+        let directory = download_directory();
+        assert!(directory.is_absolute(), "{}", directory.display());
+    }
+}

@@ -559,4 +559,94 @@ mod tests {
         std::os::unix::fs::symlink(dir.path().join("elsewhere"), &path).unwrap();
         assert!(ZoomLevels::open(path).1.is_some());
     }
+
+    #[test]
+    fn zoom_input_is_validated_and_hosts_are_capped() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut zoom, error) = ZoomLevels::open(dir.path().join("zoom.json"));
+        assert!(error.is_none());
+        let host253 = format!("{}.test", "a".repeat(248));
+        let host254 = format!("{}.test", "a".repeat(249));
+        assert_eq!(host253.len(), 253);
+        assert_eq!(host254.len(), 254);
+        assert!(zoom.set(&host254, 1.5).is_err());
+        assert!(zoom.set(&host253, 1.5).is_ok());
+        assert_eq!(zoom.get(&host253), Some(1.5));
+        assert_eq!(zoom.get("UPPER.test"), None);
+        assert!(zoom.set("UPPER.test", 1.5).is_ok());
+        assert_eq!(zoom.get("upper.test"), Some(1.5));
+        // The valid zoom range is 0.25 to 5.0, inclusive.
+        for level in [0.25, 5.0] {
+            assert!(zoom.set("bounds.test", level).is_ok(), "{level}");
+        }
+        for level in [0.1, 5.01, f64::NAN] {
+            assert!(zoom.set("bounds.test", level).is_err(), "{level}");
+        }
+    }
+
+    #[test]
+    fn download_list_drops_non_absolute_and_wrong_version_records() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("downloads.json");
+        std::fs::write(
+            &path,
+            br#"{"version":1,"downloads":[
+                {"path":"relative.txt","source":"","size":0,"finished":0,"outcome":"completed"},
+                {"path":"/abs/ok","source":"","size":0,"finished":0,"outcome":"completed"}]}"#,
+        )
+        .unwrap();
+        let (list, error) = DownloadList::open(path.clone());
+        assert!(error.is_none());
+        assert_eq!(list.records().len(), 1);
+        assert_eq!(list.records()[0].path, PathBuf::from("/abs/ok"));
+        std::fs::write(&path, br#"{"version":9,"downloads":[]}"#).unwrap();
+        let (list, error) = DownloadList::open(path);
+        assert!(error.is_some() && list.records().is_empty());
+    }
+
+    #[test]
+    fn site_origins_normalize_ports_and_schemes() {
+        assert_eq!(
+            site_origin("HTTPS://A.TEST:443/x").as_deref(),
+            Some("https://a.test")
+        );
+        assert_eq!(
+            site_origin("http://Example.test:8080").as_deref(),
+            Some("http://example.test:8080")
+        );
+        assert_eq!(
+            site_origin("https://a.test").as_deref(),
+            Some("https://a.test")
+        );
+        for rejected in ["ftp://a.test", "bitter://history", "", "file:///tmp/a"] {
+            assert_eq!(site_origin(rejected), None, "{rejected}");
+        }
+    }
+
+    #[test]
+    fn site_settings_replace_answers_and_forget_permissions() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("site-settings.json");
+        let (mut sites, error) = SiteSettings::open(path.clone());
+        assert!(error.is_none());
+        let origin = "https://a.test";
+        sites.set(origin, Permission::Camera, true).unwrap();
+        sites.set(origin, Permission::Camera, false).unwrap();
+        assert_eq!(sites.decision(origin, Permission::Camera), Some(false));
+        sites.set(origin, Permission::Camera, true).unwrap();
+        assert_eq!(sites.permissions().len(), 1);
+        sites.set(origin, Permission::Notifications, false).unwrap();
+        assert_eq!(
+            sites.decision(origin, Permission::Notifications),
+            Some(false)
+        );
+        sites.forget(origin, Permission::Camera).unwrap();
+        assert_eq!(sites.decision(origin, Permission::Camera), None);
+        let (sites, _) = SiteSettings::open(path);
+        assert_eq!(sites.decision(origin, Permission::Camera), None);
+        assert_eq!(
+            sites.decision(origin, Permission::Notifications),
+            Some(false)
+        );
+    }
 }

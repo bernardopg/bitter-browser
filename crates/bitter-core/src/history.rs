@@ -280,4 +280,113 @@ mod tests {
             Some("\"https\" \"example\" \"com\" \"path\" \"q\" \"rust\" \"browser\"*".to_string())
         );
     }
+
+    #[test]
+    fn add_visit_accumulates_titles_and_counts() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::open(dir.path()).unwrap();
+        history.add_visit("https://a.test/", Some("First")).unwrap();
+        history
+            .add_visit("https://a.test/", Some("Second"))
+            .unwrap();
+        history.add_visit("https://a.test/", None).unwrap();
+        let (count, title): (i64, String) = history
+            .conn
+            .query_row(
+                "SELECT visit_count, title FROM history WHERE url = 'https://a.test/'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(count, 3);
+        assert_eq!(title, "Second");
+        history.update_title("https://a.test/", "Renamed").unwrap();
+        let title: String = history
+            .conn
+            .query_row(
+                "SELECT title FROM history WHERE url = 'https://a.test/'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(title, "Renamed");
+    }
+
+    #[test]
+    fn recent_orders_newest_first_and_honors_limits() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::open(dir.path()).unwrap();
+        assert!(history.recent(10).unwrap().is_empty());
+        history.add_visit("https://a.test/", None).unwrap();
+        history
+            .conn
+            .execute(
+                "UPDATE history SET last_visit_time = 100 WHERE url = 'https://a.test/'",
+                [],
+            )
+            .unwrap();
+        history
+            .add_visit("https://b.test/", Some("B page"))
+            .unwrap();
+        assert!(history.recent(0).unwrap().is_empty());
+        assert_eq!(
+            history.recent(1).unwrap(),
+            [("https://b.test/".to_owned(), "B page".to_owned())]
+        );
+        let recent = history.recent(10).unwrap();
+        assert_eq!(recent[0].0, "https://b.test/");
+        assert_eq!(recent[1].0, "https://a.test/");
+    }
+
+    #[test]
+    fn search_without_terms_falls_back_to_recent() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::open(dir.path()).unwrap();
+        history
+            .add_visit("https://a.test/", Some("A page"))
+            .unwrap();
+        assert_eq!(history.search("!!!").unwrap(), history.recent(10).unwrap());
+    }
+
+    #[test]
+    fn clear_since_reports_how_many_rows_it_removed() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::open(dir.path()).unwrap();
+        assert_eq!(history.clear_since(Some(1_000)).unwrap(), 0);
+        history.add_visit("https://a.test/", None).unwrap();
+        history
+            .conn
+            .execute(
+                "UPDATE history SET last_visit_time = 5 WHERE url = 'https://a.test/'",
+                [],
+            )
+            .unwrap();
+        assert_eq!(history.clear_since(Some(10)).unwrap(), 0);
+        assert_eq!(history.clear_since(Some(5)).unwrap(), 1);
+        assert!(history.recent(10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn update_title_of_an_unknown_url_is_a_noop() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::open(dir.path()).unwrap();
+        history
+            .update_title("https://missing.test/", "Nope")
+            .unwrap();
+        assert!(history.recent(10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn open_for_search_reads_existing_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::open(dir.path()).unwrap();
+        history
+            .add_visit("https://a.test/", Some("A page"))
+            .unwrap();
+        let read_only = History::open_for_search(dir.path()).unwrap();
+        assert_eq!(read_only.search("a.test").unwrap()[0].0, "https://a.test/");
+        // A missing database is an error, not a silent empty one.
+        let missing = tempfile::tempdir().unwrap();
+        assert!(History::open_for_search(missing.path()).is_err());
+    }
 }

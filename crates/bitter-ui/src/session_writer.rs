@@ -95,4 +95,17 @@ mod tests {
         drop(writer);
         assert_eq!(session::load(&path).unwrap(), snapshot);
     }
+
+    #[test]
+    fn finish_flushes_queued_snapshots_and_stays_idle() {
+        let profile = tempfile::tempdir().unwrap();
+        let path = profile.path().join("session.json");
+        let mut writer = SessionWriter::new(path.clone()).unwrap();
+        writer.queue(Session::default());
+        writer.finish();
+        // Queuing after the worker is gone is a no-op; the file keeps the
+        // snapshot that was flushed when the worker stopped.
+        writer.queue(Session::default());
+        assert_eq!(session::load(&path).unwrap(), Session::default());
+    }
 }

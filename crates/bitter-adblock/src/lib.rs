@@ -709,4 +709,128 @@ mod tests {
             regex(filter);
         }
     }
+
+    #[test]
+    fn looks_like_filter_lists_need_a_header_and_many_rules() {
+        let mut list = String::from("[Adblock Plus 2.0]\n");
+        for index in 0..10 {
+            list.push_str(&format!("||rule{index}.test^\n"));
+        }
+        assert!(looks_like_filter_list(&list));
+        // One rule fewer, or no header, is not a list.
+        assert!(!looks_like_filter_list(&list.replacen(
+            "||rule0.test^\n",
+            "",
+            1
+        )));
+        assert!(!looks_like_filter_list(
+            &list.replace("[Adblock Plus 2.0]", "!hidden")
+        ));
+        // Comment lines do not count as rules.
+        assert!(!looks_like_filter_list(
+            "[Adblock Plus 2.0]\n! only the header and comments\n! another\n"
+        ));
+    }
+
+    #[test]
+    fn supported_selectors_reject_unsupported_syntax() {
+        assert!(supported_selector("div.ad").is_some());
+        assert!(supported_selector("a:hover").is_some());
+        for bad in [
+            "",
+            "+div",
+            "^div",
+            "a{",
+            "a}",
+            "a\\b",
+            "a:has-text(x)",
+            "a:-abp-has(b)",
+            "a:contains(b)",
+            "a:xpath(//b)",
+            "a:matches-css",
+            "a:matches-attr(b)",
+            "a:matches-path(b)",
+            "a:upward(b)",
+            "a:remove()",
+            "a:style(b)",
+            "a:min-text-length(5)",
+            "a:watch-attr(b)",
+            "a:others(b)",
+            "a:nth-ancestor(2)",
+            "é.com",
+        ] {
+            assert!(supported_selector(bad).is_none(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn domains_are_normalized_and_length_checked() {
+        assert_eq!(
+            valid_domain("  EXAMPLE.test ").as_deref(),
+            Some("example.test")
+        );
+        assert_eq!(valid_domain("a..b").as_deref(), Some("a..b"));
+        assert_eq!(valid_domain(".a.test").as_deref(), None);
+        assert_eq!(valid_domain("a.test.").as_deref(), None);
+        assert_eq!(valid_domain("a b.test").as_deref(), None);
+        assert_eq!(valid_domain("a\tb").as_deref(), None);
+        assert_eq!(valid_domain("").as_deref(), None);
+        let host253 = format!("{}.test", "a".repeat(248));
+        assert_eq!(host253.len(), 253);
+        assert_eq!(valid_domain(&host253).as_deref(), Some(host253.as_str()));
+        assert!(valid_domain(&format!("{}.test", "a".repeat(249))).is_none());
+    }
+
+    #[test]
+    fn url_filters_reject_webkit_unsupported_patterns() {
+        assert_eq!(url_filter("/a/b/", false), None); // regular expression syntax
+        assert_eq!(url_filter("a b", false), None); // not every character is graphic
+        assert_eq!(url_filter("", false), None);
+        assert_eq!(url_filter("|", false), None);
+        assert_eq!(url_filter("*", false), None);
+        assert_eq!(url_filter("||", false), None);
+        assert_eq!(url_filter("a\\x", false), Some("a\\\\x".to_string())); // backslash escaped
+        assert_eq!(url_filter("a.test", false), Some("a\\.test".to_string()));
+        assert_eq!(
+            url_filter("|http://example.com|", false),
+            Some("^http://example\\.com$".to_string())
+        );
+        assert_eq!(
+            url_filter("||ads.test^", false),
+            Some("^[^:]+://+([^:/]+\\.)?ads\\.test[^a-zA-Z0-9_.%-]".to_string())
+        );
+    }
+
+    #[test]
+    fn document_exceptions_cover_sites_and_reject_other_types() {
+        let rules = rules("@@||trusted.test^$document\n||a.test^\n");
+        assert_eq!(rules[0]["action"]["type"], "block");
+        assert_eq!(rules[1]["trigger"]["if-domain"], json!(["*trusted.test"]));
+        assert_eq!(rules[1]["action"]["type"], "ignore-previous-rules");
+        for line in [
+            "||a.test^$document",
+            "@@a.test$document",
+            "@@||a.test^$document,script",
+            "@@||a.test^$~document",
+        ] {
+            let conversion = convert(line, Scope::Full);
+            assert_eq!(conversion.rules, 0, "{line}");
+        }
+    }
+
+    #[test]
+    fn options_merge_types_parties_and_domains() {
+        let rules = rules(
+            "||a.test^$~script,~stylesheet,domain=~shop.test\n\
+             ||b.test^$xmlhttprequest,websocket,other\n",
+        );
+        assert_eq!(
+            rules[0]["trigger"]["resource-type"],
+            json!(["font", "image", "media", "popup", "raw", "svg-document"])
+        );
+        assert_eq!(rules[0]["trigger"]["unless-domain"], json!(["*shop.test"]));
+        assert_eq!(rules[1]["trigger"]["resource-type"], json!(["raw"]));
+        // Both party filters in one rule cannot be expressed.
+        assert_eq!(convert("||a.test^$script,~image", Scope::Full).rules, 0);
+    }
 }

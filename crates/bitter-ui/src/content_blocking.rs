@@ -439,9 +439,14 @@ mod tests {
             lists,
             updated: age.map(|age| SystemTime::now() - age),
         };
+        assert_eq!(ready(vec!["EasyList"], None).describe(), "EasyList");
         assert_eq!(
             ready(vec!["EasyList", "EasyPrivacy"], Some(day * 3)).describe(),
             "EasyList and EasyPrivacy, updated 3 days ago"
+        );
+        assert_eq!(
+            ready(vec!["EasyList"], Some(day * 2)).describe(),
+            "EasyList, updated 2 days ago"
         );
         assert_eq!(
             ready(vec!["EasyList"], Some(Duration::from_secs(60))).describe(),
@@ -456,6 +461,48 @@ mod tests {
             Status::Failed("offline".into())
                 .describe()
                 .ends_with("offline")
+        );
+    }
+
+    #[test]
+    fn filter_ids_are_namespaced_and_deterministic() {
+        assert_eq!(ContentBlocker::compiled_id("easylist"), "easylist-v1");
+        assert_eq!(ContentBlocker::compiled_id("easyprivacy"), "easyprivacy-v1");
+        let builtin = ContentBlocker::builtin_id();
+        assert!(builtin.starts_with("builtin-"));
+        assert!(builtin.ends_with("-v1"));
+        assert_eq!(builtin.len(), "builtin-".len() + 16 + 3);
+        assert!(builtin[8..24].chars().all(|ch| ch.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn accept_download_renames_validated_lists() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("filter-lists")).unwrap();
+        let blocker = ContentBlocker::new(
+            &dir.path().join("compiled"),
+            dir.path().join("filter-lists"),
+        );
+        let list = &REMOTE_LISTS[0];
+        let partial = dir.path().join("easylist.txt.part");
+        let mut text = String::from("[Adblock Plus 2.0]\n! comment\n");
+        for index in 0..12 {
+            text.push_str(&format!("||rule{index}.test^\n"));
+        }
+        std::fs::write(&partial, &text).unwrap();
+        let text = blocker.accept_download(list, &partial).unwrap();
+        assert!(text.starts_with("[Adblock Plus 2.0]"));
+        assert!(blocker.source_path(list).is_file());
+        // Anything that is not a filter list is rejected.
+        std::fs::write(&partial, "not a filter list").unwrap();
+        assert!(blocker.accept_download(list, &partial).is_err());
+        std::fs::write(&partial, "[Adblock Plus 2.0]\n||too-few.test^\n").unwrap();
+        assert!(blocker.accept_download(list, &partial).is_err());
+        // A missing file is an error, too.
+        assert!(
+            blocker
+                .accept_download(list, &dir.path().join("missing.part"))
+                .is_err()
         );
     }
 }

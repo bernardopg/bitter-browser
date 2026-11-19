@@ -139,4 +139,19 @@ mod tests {
             dir.path().join("new (1).txt")
         );
     }
+
+    #[test]
+    fn names_that_are_too_long_keep_their_extension() {
+        let name = safe_file_name(&format!("{}.zip", "y".repeat(197)));
+        assert_eq!(name.len(), MAX_NAME_BYTES);
+        assert!(name.ends_with(".zip"));
+        assert_eq!(
+            safe_file_name(&"x".repeat(MAX_NAME_BYTES)).len(),
+            MAX_NAME_BYTES
+        );
+        // Extensions longer than the limit are dropped.
+        assert_eq!(safe_file_name(&format!("file.{}", "z".repeat(200))), "file");
+        // Names without a visible extension stay as they are.
+        assert_eq!(safe_file_name("  name.. "), "name");
+    }
 }

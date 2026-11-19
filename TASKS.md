@@ -15,7 +15,7 @@ most of it works, until its remaining gaps are closed.
 | Privacy and security | Per-site permissions, ad and tracker blocking (built-in list, EasyList, EasyPrivacy), HTTPS-only mode, tracking prevention, third-party cookie policy, clearing browsing data. No private browsing, threat model or security review yet. |
 | Data | Locked XDG profile, versioned SQLite migrations, validated atomic configuration, atomic session, site settings, zoom and download records. |
 | Packaging | Offline Flatpak, release and `-git` Arch packages, signed tags, SBOM, checksums and provenance attestations. v0.2.1 was installed from its release assets with pacman and Flatpak and used on a Hyprland Wayland session. |
-| Verification | 58 unit and integration tests, a display test for preferences and an Xvfb smoke test in CI that drives the real browser against loopback fixtures. Line coverage of the automated tests is 32.7% (`cargo llvm-cov`, 2026-11-19); the smoke test is not instrumented. |
+| Verification | 104 unit and integration tests, a display test for preferences and an Xvfb smoke test in CI that drives the real browser against loopback fixtures. Line coverage of the automated tests is 40.24% (`cargo llvm-cov`, 2026-11-19); the smoke test is not instrumented. |
 | Not started | Product contract, threat model, quality gates (PRD-01 to PRD-04), accessibility and localization, compatibility matrix, private profiles, backup and import, extensions decision. |
 
 Scope is Linux x86-64, Wayland and X11, and the documented Flatpak and Arch

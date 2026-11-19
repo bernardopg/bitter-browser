@@ -893,4 +893,44 @@ mod tests {
         recovery.close();
         window.close();
     }
+
+    #[test]
+    fn clear_ranges_cover_from_one_hour_to_all_time() {
+        assert_eq!(CLEAR_RANGES[0], ("Last hour", Some(3600)));
+        assert_eq!(CLEAR_RANGES[1], ("Last 24 hours", Some(24 * 3600)));
+        assert_eq!(CLEAR_RANGES[2], ("Last 7 days", Some(7 * 24 * 3600)));
+        assert_eq!(CLEAR_RANGES[3], ("Last 4 weeks", Some(28 * 24 * 3600)));
+        assert_eq!(CLEAR_RANGES[4], ("All time", None));
+        assert_eq!(CLEAR_RANGES.len(), 5);
+    }
+
+    #[test]
+    fn displayed_origins_show_the_host_and_raw_fallback() {
+        assert_eq!(display_origin("https://Example.test/a?b"), "example.test");
+        assert_eq!(display_origin("http://localhost:8080"), "localhost");
+        assert_eq!(display_origin("not an origin"), "not an origin");
+    }
+
+    #[test]
+    fn current_returns_defaults_when_the_store_is_broken() {
+        let dir = tempfile::tempdir().unwrap();
+        let broken = dir.path().join("broken.toml");
+        std::fs::write(&broken, "[broken configuration").unwrap();
+        let state: PreferenceState = Rc::new(RefCell::new(ConfigStore::open(broken)));
+        assert_eq!(current(&state), Preferences::default());
+        let good = dir.path().join("good.toml");
+        let state: PreferenceState = Rc::new(RefCell::new(ConfigStore::open(good)));
+        assert_eq!(current(&state), Preferences::default());
+    }
+
+    #[test]
+    fn index_of_falls_back_to_the_first_choice_when_missing() {
+        let choices: [(u32, String); 3] = [
+            (1, "DuckDuckGo".into()),
+            (2, "Brave Search".into()),
+            (3, "Google".into()),
+        ];
+        assert_eq!(index_of(&choices, 3), 2);
+        assert_eq!(index_of(&choices, 9), 0);
+    }
 }
