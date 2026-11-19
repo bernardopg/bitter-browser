@@ -6,4 +6,6 @@ CodeQL analyzes Rust and GitHub Actions without a build. Dependabot checks Cargo
 
 Workflows use the automatically supplied, scoped `GITHUB_TOKEN`; no personal access token, third-party coverage service, or repository secret is required. Fork PR tokens are restricted. Local hooks are optional and must not be treated as security enforcement.
 
+Pull requests opened by the repository owner from a branch of this repository get auto-merge enabled with a merge commit. GitHub merges them only after all required checks pass and the branch is up to date with `main`; draft pull requests, forks and Dependabot are excluded. Disable it for one pull request with `gh pr merge --disable-auto`. Because merges made with `GITHUB_TOKEN` do not trigger push workflows, the same workflow dispatches CI and CodeQL on `main` after an automatic merge.
+
 For a release, update workspace, Meson and PKGBUILD versions together, run checks, build and validate the Flatpak, merge the reviewed PR, and create a tag and GitHub release pointing at the merged commit. Attach the bundle and checksum. The repository does not currently automate publishing or signing; verify the release and assets after upload.
