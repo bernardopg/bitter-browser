@@ -8,7 +8,7 @@ when the respective variable is unset.
 | Location | Contents |
 | --- | --- |
 | `$XDG_CONFIG_HOME/bitter-browser/` | `config.toml` |
-| `$XDG_DATA_HOME/bitter-browser/` | `history.sqlite` and `bookmarks.sqlite` |
+| `$XDG_DATA_HOME/bitter-browser/` | `history.sqlite`, `bookmarks.sqlite` and `session.json` |
 | `$XDG_DATA_HOME/bitter-ui/` | Persistent WebKit website data |
 | `$XDG_CACHE_HOME/bitter-ui/` | WebKit cache |
 

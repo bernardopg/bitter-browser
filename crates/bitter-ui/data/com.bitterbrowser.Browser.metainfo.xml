@@ -4,16 +4,52 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MPL-2.0</project_license>
   <name>Bitter Browser</name>
-  <summary>The browser that bites back — fast, sharp, and precise.</summary>
+  <summary>Focused, native web browser for the Linux desktop</summary>
+  <developer id="io.github.bernardopg">
+    <name>Bitter Browser Contributors</name>
+  </developer>
   <description>
     <p>
-      Bitter Browser is a next-generation, developer-first web browser for Arch Linux that combines
-      the best qualities of Arc, Chrome, Firefox, Vivaldi, and Zen Browser into a single, cohesive,
-      highly efficient, and visually stunning product.
+      Bitter Browser is an experimental web browser built with Rust, GTK 4, libadwaita and
+      WebKitGTK. It keeps tabs in a vertical sidebar and organizes them in two workspaces.
+    </p>
+    <ul>
+      <li>Two workspaces with their own tab order and selection</li>
+      <li>Session restore that loads only the selected tab at startup</li>
+      <li>Address bar suggestions from local history, bookmarks and open tabs</li>
+      <li>Native error pages with retry for connection and certificate failures</li>
+      <li>Light, dark and system color schemes</li>
+    </ul>
+    <p>
+      The project is not yet production ready. Ad and tracker blocking and HTTPS-only mode
+      are not available.
     </p>
   </description>
   <launchable type="desktop-id">com.bitterbrowser.Browser.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <caption>History in the dark color scheme</caption>
+      <image>https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/history-dark.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Bookmarks in the light color scheme</caption>
+      <image>https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/bookmarks-light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Preferences</caption>
+      <image>https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/preferences-dark.png</image>
+    </screenshot>
+  </screenshots>
   <url type="homepage">https://github.com/bernardopg/bitter-browser</url>
   <url type="bugtracker">https://github.com/bernardopg/bitter-browser/issues</url>
-  <developer_name>Bitter Browser Contributors</developer_name>
+  <url type="vcs-browser">https://github.com/bernardopg/bitter-browser</url>
+  <url type="donation">https://github.com/sponsors/bernardopg</url>
+  <content_rating type="oars-1.1"/>
+  <categories>
+    <category>Network</category>
+    <category>WebBrowser</category>
+  </categories>
+  <releases>
+    <release version="0.1.1" date="2026-11-17"/>
+  </releases>
 </component>
