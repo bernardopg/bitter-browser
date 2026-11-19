@@ -101,17 +101,30 @@ impl ZoomLevels {
             .map(|(_, level)| *level)
     }
 
-    /// Remembers `level` for `host`; 100% forgets the host.
+    /// Remembers `level` for `host`.
     pub fn set(&mut self, host: &str, level: f64) -> io::Result<()> {
         let host = host.to_ascii_lowercase();
         if !valid_host(&host) || !valid_zoom(level) {
             return Err(invalid("invalid zoom entry"));
         }
         self.sites.retain(|(site, _)| *site != host);
-        if (level - 1.0).abs() > f64::EPSILON {
-            self.sites.insert(0, (host, level));
-            self.sites.truncate(MAX_ZOOM_SITES);
+        self.sites.insert(0, (host, level));
+        self.sites.truncate(MAX_ZOOM_SITES);
+        self.write()
+    }
+
+    /// Forgets `host`, so it uses the default zoom again.
+    pub fn forget(&mut self, host: &str) -> io::Result<()> {
+        let host = host.to_ascii_lowercase();
+        let before = self.sites.len();
+        self.sites.retain(|(site, _)| *site != host);
+        if self.sites.len() == before {
+            return Ok(());
         }
+        self.write()
+    }
+
+    fn write(&self) -> io::Result<()> {
         save(
             &self.path,
             ZOOM_VERSION,
@@ -203,12 +216,265 @@ impl DownloadList {
     }
 }
 
+/// A capability a site asks for. Screen sharing is never remembered.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum Permission {
+    Notifications,
+    Location,
+    Camera,
+    Microphone,
+    Clipboard,
+}
+
+impl Permission {
+    pub const ALL: [Self; 5] = [
+        Self::Notifications,
+        Self::Location,
+        Self::Camera,
+        Self::Microphone,
+        Self::Clipboard,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Notifications => "Notifications",
+            Self::Location => "Location",
+            Self::Camera => "Camera",
+            Self::Microphone => "Microphone",
+            Self::Clipboard => "Read clipboard",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct SitePermission {
+    /// `scheme://host[:port]`, as returned by [`site_origin`].
+    pub origin: String,
+    pub permission: Permission,
+    pub allowed: bool,
+}
+
+pub const MAX_SITE_PERMISSIONS: usize = 1000;
+const SITE_SETTINGS_VERSION: u32 = 1;
+
+/// Remembered permission answers and the sites where content blocking is off.
+#[derive(Debug, Default)]
+pub struct SiteSettings {
+    path: PathBuf,
+    permissions: Vec<SitePermission>,
+    unblocked: Vec<String>,
+}
+
+#[derive(Default, Deserialize, Serialize)]
+struct SiteData {
+    #[serde(default)]
+    permissions: Vec<SitePermission>,
+    #[serde(default)]
+    unblocked: Vec<String>,
+}
+
+/// The origin a permission is remembered for: web origins only, normalized
+/// to lower case without a default port.
+pub fn site_origin(uri: &str) -> Option<String> {
+    let url = url::Url::parse(uri).ok()?;
+    if !matches!(url.scheme(), "http" | "https") {
+        return None;
+    }
+    let origin = url.origin().ascii_serialization();
+    (origin != "null").then_some(origin)
+}
+
+impl SiteSettings {
+    pub fn open(path: PathBuf) -> (Self, Option<io::Error>) {
+        let (data, error) = match load::<SiteData>(&path, SITE_SETTINGS_VERSION) {
+            Ok(data) => (data, None),
+            Err(error) => (SiteData::default(), Some(error)),
+        };
+        let mut permissions: Vec<SitePermission> = Vec::new();
+        for entry in data.permissions {
+            let normalized = site_origin(&entry.origin);
+            if normalized.as_deref() == Some(entry.origin.as_str())
+                && !permissions.iter().any(|known| {
+                    known.origin == entry.origin && known.permission == entry.permission
+                })
+            {
+                permissions.push(entry);
+            }
+        }
+        permissions.truncate(MAX_SITE_PERMISSIONS);
+        let mut unblocked: Vec<String> = Vec::new();
+        for host in data.unblocked {
+            let host = host.to_ascii_lowercase();
+            if valid_host(&host) && !unblocked.contains(&host) {
+                unblocked.push(host);
+            }
+        }
+        unblocked.truncate(MAX_SITE_PERMISSIONS);
+        let settings = Self {
+            path,
+            permissions,
+            unblocked,
+        };
+        (settings, error)
+    }
+
+    pub fn permissions(&self) -> &[SitePermission] {
+        &self.permissions
+    }
+
+    pub fn decision(&self, origin: &str, permission: Permission) -> Option<bool> {
+        self.permissions
+            .iter()
+            .find(|entry| entry.origin == origin && entry.permission == permission)
+            .map(|entry| entry.allowed)
+    }
+
+    pub fn set(&mut self, origin: &str, permission: Permission, allowed: bool) -> io::Result<()> {
+        if site_origin(origin).as_deref() != Some(origin) {
+            return Err(invalid("invalid site origin"));
+        }
+        self.permissions
+            .retain(|entry| !(entry.origin == origin && entry.permission == permission));
+        self.permissions.insert(
+            0,
+            SitePermission {
+                origin: origin.to_owned(),
+                permission,
+                allowed,
+            },
+        );
+        self.permissions.truncate(MAX_SITE_PERMISSIONS);
+        self.write()
+    }
+
+    pub fn forget(&mut self, origin: &str, permission: Permission) -> io::Result<()> {
+        self.permissions
+            .retain(|entry| !(entry.origin == origin && entry.permission == permission));
+        self.write()
+    }
+
+    pub fn unblocked(&self) -> &[String] {
+        &self.unblocked
+    }
+
+    pub fn is_unblocked(&self, host: &str) -> bool {
+        let host = host.to_ascii_lowercase();
+        self.unblocked.contains(&host)
+    }
+
+    /// Turns content blocking off (`true`) or back on for `host`.
+    pub fn set_unblocked(&mut self, host: &str, unblocked: bool) -> io::Result<()> {
+        let host = host.to_ascii_lowercase();
+        if !valid_host(&host) {
+            return Err(invalid("invalid host"));
+        }
+        self.unblocked.retain(|known| *known != host);
+        if unblocked {
+            self.unblocked.insert(0, host);
+            self.unblocked.truncate(MAX_SITE_PERMISSIONS);
+        }
+        self.write()
+    }
+
+    /// Forgets every permission answer, keeping the blocking exceptions.
+    pub fn clear_permissions(&mut self) -> io::Result<()> {
+        self.permissions.clear();
+        self.write()
+    }
+
+    fn write(&self) -> io::Result<()> {
+        save(
+            &self.path,
+            SITE_SETTINGS_VERSION,
+            &SiteData {
+                permissions: self.permissions.clone(),
+                unblocked: self.unblocked.clone(),
+            },
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn zoom_levels_persist_per_host_and_forget_the_default() {
+    fn site_permissions_persist_per_origin_and_reject_non_web_origins() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("site-settings.json");
+        let (mut sites, error) = SiteSettings::open(path.clone());
+        assert!(error.is_none());
+        let meet = site_origin("HTTPS://Meet.Example.test:443/room?x").unwrap();
+        assert_eq!(meet, "https://meet.example.test");
+        assert_eq!(
+            site_origin("http://127.0.0.1:8080/a").as_deref(),
+            Some("http://127.0.0.1:8080")
+        );
+        for rejected in [
+            "bitter://history",
+            "file:///tmp/a",
+            "data:text/html,x",
+            "nope",
+        ] {
+            assert_eq!(site_origin(rejected), None, "{rejected}");
+        }
+        sites.set(&meet, Permission::Camera, true).unwrap();
+        sites.set(&meet, Permission::Notifications, false).unwrap();
+        sites.set(&meet, Permission::Camera, false).unwrap();
+        assert!(
+            sites
+                .set("https://Meet.example.test", Permission::Camera, true)
+                .is_err()
+        );
+        sites.set_unblocked("News.Example.test", true).unwrap();
+        assert!(sites.set_unblocked("", true).is_err());
+
+        let (mut sites, _) = SiteSettings::open(path.clone());
+        assert_eq!(sites.permissions().len(), 2);
+        assert_eq!(sites.decision(&meet, Permission::Camera), Some(false));
+        assert_eq!(
+            sites.decision(&meet, Permission::Notifications),
+            Some(false)
+        );
+        assert_eq!(sites.decision(&meet, Permission::Location), None);
+        assert!(sites.is_unblocked("news.example.test"));
+        sites.forget(&meet, Permission::Camera).unwrap();
+        sites.set_unblocked("news.example.test", false).unwrap();
+        sites.clear_permissions().unwrap();
+        let (sites, _) = SiteSettings::open(path);
+        assert!(sites.permissions().is_empty() && sites.unblocked().is_empty());
+    }
+
+    #[test]
+    fn site_settings_drop_invalid_and_duplicate_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("site-settings.json");
+        std::fs::write(
+            &path,
+            br#"{"version":1,"permissions":[
+                {"origin":"https://a.test","permission":"camera","allowed":true},
+                {"origin":"https://a.test","permission":"camera","allowed":false},
+                {"origin":"HTTPS://B.test","permission":"location","allowed":true},
+                {"origin":"file:///x","permission":"location","allowed":true}],
+              "unblocked":["A.test","a.test","bad/host"]}"#,
+        )
+        .unwrap();
+        let (sites, error) = SiteSettings::open(path.clone());
+        assert!(error.is_none());
+        assert_eq!(sites.permissions().len(), 1);
+        assert_eq!(
+            sites.decision("https://a.test", Permission::Camera),
+            Some(true)
+        );
+        assert_eq!(sites.unblocked(), ["a.test"]);
+        std::fs::write(&path, br#"{"version":1,"permissions":[{"origin":"https://a.test","permission":"teleport","allowed":true}]}"#).unwrap();
+        let (sites, error) = SiteSettings::open(path);
+        assert!(error.is_some() && sites.permissions().is_empty());
+    }
+
+    #[test]
+    fn zoom_levels_persist_per_host_and_can_be_forgotten() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("zoom.json");
         let (mut zoom, error) = ZoomLevels::open(path.clone());
@@ -218,9 +484,11 @@ mod tests {
         let (mut zoom, _) = ZoomLevels::open(path.clone());
         assert_eq!(zoom.get("example.test"), Some(1.25));
         assert_eq!(zoom.get("other.test"), Some(0.8));
-        zoom.set("example.test", 1.0).unwrap();
+        zoom.set("other.test", 1.0).unwrap();
+        zoom.forget("Example.test").unwrap();
         let (zoom, _) = ZoomLevels::open(path);
         assert_eq!(zoom.get("example.test"), None);
+        assert_eq!(zoom.get("other.test"), Some(1.0));
         assert!(zoom.set_is_rejected_for_invalid_input());
     }
 
