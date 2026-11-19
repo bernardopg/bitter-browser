@@ -52,6 +52,12 @@
     <category>WebBrowser</category>
   </categories>
   <releases>
+    <release version="0.2.1" date="2026-11-19">
+      <url type="details">https://github.com/bernardopg/bitter-browser/releases/tag/v0.2.1</url>
+      <description>
+        <p>Fixes the Arch package recipe attached to the release.</p>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-11-19">
       <url type="details">https://github.com/bernardopg/bitter-browser/releases/tag/v0.2.0</url>
       <description>
