@@ -1,12 +1,18 @@
 use gtk4::prelude::*;
 
-const FALLBACK_ICON: &str = "web-browser-symbolic";
+const FALLBACK_ICON: &[u8] = include_bytes!("../../data/icons/ui/tab-fallback.svg");
+
+/// A neutral globe that reads well in light and dark schemes; icon themes'
+/// generic web icons vary too much to stand in for a site.
+fn fallback_icon() -> gtk4::gio::BytesIcon {
+    gtk4::gio::BytesIcon::new(&gtk4::glib::Bytes::from_static(FALLBACK_ICON))
+}
 
 pub struct TabItem {
     row: gtk4::ListBoxRow,
     id: String,
     icon: gtk4::Image,
-    spinner: gtk4::Spinner,
+    spinner: libadwaita::Spinner,
     close_button: gtk4::Button,
     label: gtk4::Label,
 }
@@ -20,16 +26,15 @@ impl TabItem {
 
         let box_container = gtk4::Box::builder()
             .orientation(gtk4::Orientation::Horizontal)
-            .spacing(8)
-            .margin_start(8)
-            .margin_end(8)
-            .margin_top(4)
-            .margin_bottom(4)
+            .spacing(10)
+            .margin_start(10)
+            .margin_end(4)
             .build();
 
         let favicon = gtk4::Image::builder()
-            .icon_name(FALLBACK_ICON)
+            .gicon(&fallback_icon())
             .pixel_size(16)
+            .css_classes(["tab-icon"])
             .build();
 
         let label = gtk4::Label::builder()
@@ -38,16 +43,20 @@ impl TabItem {
             .xalign(0.0)
             .max_width_chars(20)
             .hexpand(true)
+            .css_classes(["tab-title"])
             .build();
 
         let close_button = gtk4::Button::builder()
             .icon_name("window-close-symbolic")
-            .css_classes(vec!["flat", "circular"])
+            .css_classes(vec!["flat", "circular", "tab-close"])
             .valign(gtk4::Align::Center)
             .build();
 
-        let spinner = gtk4::Spinner::new();
-        spinner.set_visible(false);
+        let spinner = libadwaita::Spinner::builder()
+            .width_request(16)
+            .height_request(16)
+            .visible(false)
+            .build();
         box_container.append(&favicon);
         box_container.append(&spinner);
         box_container.append(&label);
@@ -75,14 +84,13 @@ impl TabItem {
             .set_tooltip_text(Some(&format!("Close {title}")));
         self.icon.set_visible(!loading);
         self.spinner.set_visible(loading);
-        self.spinner.set_spinning(loading);
     }
 
     /// Shows the site icon, or the generic page icon when there is none.
     pub fn set_favicon(&self, favicon: Option<&gtk4::gdk::Texture>) {
         match favicon {
             Some(texture) => self.icon.set_paintable(Some(texture)),
-            None => self.icon.set_icon_name(Some(FALLBACK_ICON)),
+            None => self.icon.set_from_gicon(&fallback_icon()),
         }
     }
 

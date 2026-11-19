@@ -9,6 +9,10 @@
       <default>800</default>
       <summary>Window height</summary>
     </key>
+    <key name="sidebar-visible" type="b">
+      <default>true</default>
+      <summary>Sidebar visible</summary>
+    </key>
     <key name="is-maximized" type="b">
       <default>false</default>
       <summary>Window maximized state</summary>

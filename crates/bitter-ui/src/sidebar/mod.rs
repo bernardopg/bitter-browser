@@ -29,13 +29,15 @@ impl Sidebar {
             .child(
                 &adw::ButtonContent::builder()
                     .label("New Tab")
-                    .icon_name("tab-new-symbolic")
+                    .icon_name("list-add-symbolic")
+                    .halign(gtk4::Align::Start)
                     .build(),
             )
+            .css_classes(["flat", "new-tab"])
             .margin_start(8)
             .margin_end(8)
-            .margin_top(8)
-            .margin_bottom(8)
+            .margin_top(2)
+            .margin_bottom(6)
             .build();
 
         let scrolled_window = gtk4::ScrolledWindow::builder()

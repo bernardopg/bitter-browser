@@ -30,6 +30,15 @@ def solid_png(size, rgb):
 
 FAVICON = solid_png(16, (232, 84, 42))
 DOWNLOAD_BODY = b"Bitter Browser download fixture\n" * 64
+UPLOAD_PAGE = """<style>input{position:absolute;top:20px;left:20px;width:300px;height:60px}</style>
+<input type="file" id="file">
+<script>
+document.getElementById("file").addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  const text = await file.text();
+  fetch("/uploaded?" + encodeURIComponent([file.name, file.size, text.length].join("|")));
+});
+</script>"""
 PROBE_PAGE = """<style>body{margin:0;font:16px sans-serif}button{position:absolute;top:120px;left:10px}</style>
 <p>alpha beta alpha gamma alpha</p>
 <button onclick="document.documentElement.requestFullscreen()">Full screen</button>
@@ -52,6 +61,7 @@ XLIB.XFlush.argtypes = [ctypes.c_void_p]
 XLIB.XCloseDisplay.argtypes = [ctypes.c_void_p]
 XTST.XTestFakeKeyEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int, ctypes.c_ulong]
 F11 = 0xFFC8
+F9 = 0xFFC6
 
 
 def eventually(check, message, timeout=12):
@@ -70,6 +80,7 @@ class Fixture(BaseHTTPRequestHandler):
     release_slow = threading.Event()
 
     reports = []
+    uploads = []
 
     @classmethod
     def report(cls, predicate, since=0):
@@ -122,7 +133,15 @@ class Fixture(BaseHTTPRequestHandler):
             return
         if self.path == "/slow":
             self.release_slow.wait(10)
-        if self.path == "/probe":
+        if self.path.startswith("/uploaded?"):
+            with self.lock:
+                self.uploads.append(urllib.parse.unquote(self.path[10:]))
+            self.send_response(204)
+            self.end_headers()
+            return
+        if self.path == "/upload":
+            body = UPLOAD_PAGE
+        elif self.path == "/probe":
             body = PROBE_PAGE
         elif self.path == "/home":
             body = """<a href="/background" style="position:absolute; top:10px; left:10px">Open in background</a>
@@ -164,6 +183,8 @@ class Browser:
             "GSK_RENDERER": "cairo",
             "GTK_A11Y": "none",
             "GSETTINGS_BACKEND": "keyfile",
+            # Use in-process GTK dialogs so the harness can drive them.
+            "GDK_DEBUG": "no-portals",
             "GSETTINGS_SCHEMA_DIR": str(directory / "schemas"),
         }
         (directory / "schemas").mkdir()
@@ -197,6 +218,27 @@ class Browser:
         self.xdotool("windowmove", self.window, "60", "60")
         self.xdotool("windowfocus", "--sync", self.window)
         return elapsed
+
+    def dialog(self):
+        """The newest visible window of the browser other than the main one."""
+        def find():
+            found = subprocess.run(["xdotool", "search", "--onlyvisible", "--pid", str(self.process.pid)],
+                                   text=True, capture_output=True).stdout.split()
+            others = [window for window in found if window != self.window]
+            return others[-1] if others else None
+        try:
+            window = eventually(find, "No dialog window opened")
+        except AssertionError:
+            if self.screenshots:
+                subprocess.run(["import", "-window", "root", str(self.screenshots / "no-dialog.png")])
+            print("Windows:", subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "."],
+                                             text=True, capture_output=True).stdout.split(),
+                  "browser", self.window, "pid", self.process.pid, "downloads",
+                  list(self.downloads.glob("*")), flush=True)
+            raise
+        self.xdotool("windowfocus", "--sync", window)
+        time.sleep(0.5)
+        return window
 
     def size(self):
         geometry = dict(line.split("=", 1) for line in self.xdotool(
@@ -473,8 +515,74 @@ def run_flow(browser, base):
     step(keys("Escape"), lambda r: r[1] == width, "Leaving full screen did not restore the chrome")
     step(lambda: browser.click(270, 187), lambda r: r[2], "The page could not enter full screen")
     step(keys("Escape"), lambda r: not r[2] and r[1] == width, "The page did not leave full screen")
+    step(lambda: browser.plain_key(F9), lambda r: r[1] > width + 150, "F9 did not hide the sidebar")
+    step(lambda: browser.plain_key(F9), lambda r: r[1] == width, "F9 did not show the sidebar again")
     browser.stop()
     return {"startup_ms": round(startup * 1000), "restore_ms": round(restart * 1000)}
+
+
+def dialogs_and_persistence(binary, directory, base, screenshots):
+    """Save dialog, uploads, and zoom and download list after a restart."""
+    browser = Browser(binary, directory, screenshots)
+    config = directory / "config" / "bitter-browser"
+    config.mkdir(parents=True)
+    (config / "config.toml").write_text("version = 1\n\n[downloads]\nask_location = true\n")
+    chosen = directory / "chosen" / "picked name.txt"
+    chosen.parent.mkdir()
+    records = browser.profile / "downloads.json"
+    try:
+        browser.start()
+        time.sleep(1)
+        browser.enter(f"{base}/download")
+        browser.dialog()
+        browser.key("ctrl+a")
+        browser.xdotool("type", "--clearmodifiers", "--delay", "10", str(chosen))
+        browser.key("Return")
+        eventually(lambda: chosen.exists() and chosen.read_bytes() == DOWNLOAD_BODY,
+                   "The chosen destination was not used")
+        assert not list(browser.downloads.glob("*")), "Ask mode also saved to the download directory"
+        eventually(lambda: records.exists() and str(chosen) in records.read_text(),
+                   "The download list was not saved")
+
+        browser.enter(f"{base}/upload")
+        time.sleep(1)
+        browser.click(300, 88)
+        browser.dialog()
+        browser.key("ctrl+l")
+        browser.xdotool("type", "--clearmodifiers", "--delay", "10", str(chosen))
+        time.sleep(0.5)
+        # Drop any inline completion GTK appended after the cursor.
+        browser.key("shift+End", "Delete")
+        if screenshots:
+            subprocess.run(["import", "-window", "root", str(screenshots / "upload-dialog.png")])
+        browser.key("Return")
+        size = len(DOWNLOAD_BODY)
+        eventually(lambda: f"picked name.txt|{size}|{size}" in Fixture.uploads,
+                   f"The page did not receive the uploaded file: {Fixture.uploads}")
+
+        since = Fixture.mark()
+        browser.enter(f"{base}/probe")
+        _, width, _ = eventually(lambda: Fixture.report(lambda r: r[1] > 0, since), "Probe did not load")
+        since = Fixture.mark()
+        browser.key("ctrl+plus")
+        eventually(lambda: Fixture.report(lambda r: r[1] < width, since), "Zoom in failed")
+        time.sleep(0.3)
+        browser.stop()
+        zoom = json.loads((browser.profile / "zoom.json").read_text())
+        assert zoom["sites"] == [["127.0.0.1", 1.1]], zoom
+
+        since = Fixture.mark()
+        browser.start()
+        zoomed = eventually(lambda: Fixture.report(lambda r: r[1] > 0, since),
+                            "Restored probe did not load")
+        assert zoomed[1] < width, f"Zoom was not restored: {zoomed[1]} >= {width}"
+        browser.key("ctrl+j")
+        time.sleep(0.6)
+        browser.frame("downloads-restored")
+        browser.key("Escape")
+    finally:
+        browser.stop()
+    return {"uploaded": True, "restored_zoom_width": zoomed[1], "default_width": width}
 
 
 def window_geometry(binary, directory):
@@ -548,6 +656,8 @@ def main():
         try:
             print(json.dumps(run_flow(browser, base)), flush=True)
             print(json.dumps(window_geometry(args.binary, directory / "geometry")), flush=True)
+            print(json.dumps(dialogs_and_persistence(args.binary, directory / "dialogs", base,
+                                                     args.screenshots)), flush=True)
             if args.benchmark_samples:
                 print(json.dumps(benchmark(args.binary, directory, base, args.benchmark_samples), indent=2))
             assert "panicked" not in browser.log.read_text(), browser.log.read_text()

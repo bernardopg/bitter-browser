@@ -2,6 +2,7 @@ mod app;
 mod command_palette;
 mod downloads;
 mod find_bar;
+mod internal_pages;
 mod preferences;
 mod session_writer;
 mod sidebar;

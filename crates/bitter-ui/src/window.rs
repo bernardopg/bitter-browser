@@ -1,12 +1,14 @@
 use crate::command_palette::CommandPalette;
 use crate::downloads::Downloads;
 use crate::find_bar::FindBar;
+use crate::internal_pages::{self, ListKind, Look};
 use crate::preferences::{self, PreferenceState};
 use crate::session_writer::SessionWriter;
 use crate::sidebar::Sidebar;
 use crate::suggestion_worker::SuggestionWorker;
-use crate::toolbar::Toolbar;
+use crate::toolbar::{Toolbar, omnibar::Security};
 use crate::webview::tab::{Tab, TabView};
+use bitter_core::records::ZoomLevels;
 use bitter_core::session::{
     self, HOME_URI, MAX_TABS, SavedTab, SavedWorkspace, Session, WorkspaceId,
 };
@@ -51,8 +53,11 @@ struct Browser {
     downloads: Rc<Downloads>,
     find: Rc<FindBar>,
     fullscreen: Cell<bool>,
+    sidebar_revealer: gtk4::Revealer,
+    window_state: Option<gio::Settings>,
     page_fullscreen: Cell<bool>,
     zoom_toast: RefCell<Option<adw::Toast>>,
+    zoom_levels: RefCell<ZoomLevels>,
     history: History,
     bookmarks: Bookmarks,
     preferences: PreferenceState,
@@ -87,14 +92,29 @@ impl BitterWindow {
         let window_state = window_state::load(&window);
         let sidebar = Sidebar::new();
         let toolbar = Toolbar::new();
-        let stack = gtk4::Stack::builder().hexpand(true).vexpand(true).build();
+        let stack = gtk4::Stack::builder()
+            .hexpand(true)
+            .vexpand(true)
+            .transition_type(gtk4::StackTransitionType::Crossfade)
+            .transition_duration(140)
+            .build();
         let find = FindBar::new();
         let content = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
         content.append(toolbar.widget());
         content.append(find.widget());
         content.append(&stack);
         let main = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
-        main.append(sidebar.widget());
+        let sidebar_revealer = gtk4::Revealer::builder()
+            .transition_type(gtk4::RevealerTransitionType::SlideRight)
+            .transition_duration(220)
+            .reveal_child(
+                window_state
+                    .as_ref()
+                    .is_none_or(|settings| settings.boolean("sidebar-visible")),
+            )
+            .child(sidebar.widget())
+            .build();
+        main.append(&sidebar_revealer);
         main.append(&content);
         let feedback = adw::ToastOverlay::new();
         feedback.set_child(Some(&main));
@@ -137,6 +157,10 @@ impl BitterWindow {
                 }
             }
         }
+        let (zoom_levels, zoom_error) = ZoomLevels::open(profile.data_dir().join("zoom.json"));
+        if let Some(error) = zoom_error {
+            tracing::warn!("Could not read saved zoom levels: {error}");
+        }
         let network = webkit6::NetworkSession::new(
             Some(profile.web_data_dir()),
             Some(profile.web_cache_dir()),
@@ -144,7 +168,11 @@ impl BitterWindow {
         if let Some(data) = network.website_data_manager() {
             data.set_favicons_enabled(true);
         }
-        let downloads = Downloads::new(&feedback);
+        let downloads = Downloads::new(
+            &feedback,
+            config.clone(),
+            profile.data_dir().join("downloads.json"),
+        );
         downloads.attach(&network);
         toolbar.pack_end(downloads.widget());
         let browser = Rc::new(Browser {
@@ -157,8 +185,11 @@ impl BitterWindow {
             downloads,
             find,
             fullscreen: Cell::new(false),
+            sidebar_revealer,
+            window_state: window_state.clone(),
             page_fullscreen: Cell::new(false),
             zoom_toast: Default::default(),
+            zoom_levels: RefCell::new(zoom_levels),
             history,
             bookmarks,
             preferences: config,
@@ -260,6 +291,7 @@ impl Browser {
             ("zoom_reset", &["<Control>0", "<Control>KP_0"]),
             // F11 is handled by the capture-phase key controller below.
             ("fullscreen", &[]),
+            ("toggle_sidebar", &["F9"]),
             ("preferences", &["<Control>comma"]),
         ] {
             let action = gio::SimpleAction::new(id, None);
@@ -424,6 +456,15 @@ impl Browser {
             "zoom_out" => self.zoom(Some(false)),
             "zoom_reset" => self.zoom(None),
             "fullscreen" => self.set_fullscreen(!self.fullscreen.get()),
+            "toggle_sidebar" => {
+                let visible = !self.sidebar_revealer.reveals_child();
+                self.sidebar_revealer.set_reveal_child(visible);
+                if let Some(settings) = &self.window_state
+                    && let Err(error) = settings.set_boolean("sidebar-visible", visible)
+                {
+                    tracing::warn!("Could not save the sidebar state: {error}");
+                }
+            }
             "copy_url" => {
                 if let (Some(display), Some(tab)) = (gtk4::gdk::Display::default(), self.active()) {
                     display.clipboard().set_text(&tab.uri());
@@ -684,18 +725,49 @@ impl Browser {
         self.feedback.add_toast(adw::Toast::new(message));
     }
 
-    /// Steps the active tab's zoom, or resets it when `zoom_in` is `None`.
+    /// Recently visited sites for the New Tab page, one per host.
+    fn frequent_sites(&self) -> Vec<(String, String)> {
+        let Ok(rows) = self.history.recent(200) else {
+            return Vec::new();
+        };
+        let mut hosts = std::collections::HashSet::new();
+        rows.into_iter()
+            .filter(|(url, _)| {
+                url::Url::parse(url)
+                    .ok()
+                    .and_then(|url| url.host_str().map(str::to_owned))
+                    .is_some_and(|host| hosts.insert(host))
+            })
+            .take(8)
+            .collect()
+    }
+
+    fn saved_zoom(&self, uri: &str) -> f64 {
+        zoom_host(uri)
+            .and_then(|host| self.zoom_levels.borrow().get(&host))
+            .unwrap_or(1.0)
+    }
+
+    /// Steps the active tab's zoom, or resets it when `zoom_in` is `None`,
+    /// and remembers the level for the page's site.
     fn zoom(&self, zoom_in: Option<bool>) {
-        self.with_view(|_, view| {
+        self.with_view(|tab, view| {
             let level = match zoom_in {
                 Some(zoom_in) => next_zoom(view.web.zoom_level(), zoom_in),
                 None => 1.0,
             };
             view.web.set_zoom_level(level);
-            let toast = adw::Toast::builder()
-                .title(format!("Zoom {:.0}%", level * 100.0))
-                .timeout(2)
-                .build();
+            let host = zoom_host(&tab.uri());
+            if let Some(host) = &host
+                && let Err(error) = self.zoom_levels.borrow_mut().set(host, level)
+            {
+                tracing::warn!("Could not save the zoom level: {error}");
+            }
+            let title = match &host {
+                Some(host) => format!("Zoom {:.0}% for {host}", level * 100.0),
+                None => format!("Zoom {:.0}%", level * 100.0),
+            };
+            let toast = adw::Toast::builder().title(title).timeout(2).build();
             if let Some(previous) = self.zoom_toast.replace(Some(toast.clone())) {
                 previous.dismiss();
             }
@@ -708,7 +780,7 @@ impl Browser {
         if self.fullscreen.replace(fullscreen) == fullscreen {
             return;
         }
-        self.sidebar.widget().set_visible(!fullscreen);
+        self.sidebar_revealer.set_visible(!fullscreen);
         self.toolbar.widget().set_visible(!fullscreen);
         if let Some(window) = self.window.upgrade() {
             if fullscreen {
@@ -760,27 +832,21 @@ impl Browser {
 
     fn navigate(&self, tab: &Tab, view: &TabView, uri: &str) {
         let html = match uri {
-            HOME_URI => Some(internal_page_shell(
-                "New Tab",
-                r#"<section class="empty"><p>Enter an address or search in the address bar.</p><p><kbd>Ctrl</kbd> + <kbd>L</kbd> focuses the address bar.</p></section>"#,
+            HOME_URI => Some(internal_pages::new_tab(
+                &Look::current(),
+                &self.frequent_sites(),
             )),
-            "bitter://history" => Some(match self.history.recent(50) {
-                Ok(rows) => internal_list_page(
-                    "History",
-                    "Recent pages",
-                    &rows,
-                    "History will appear here after you visit pages.",
-                ),
-                Err(error) => unavailable_list_page("History", &error.to_string()),
+            "bitter://history" => Some(match self.history.recent(100) {
+                Ok(rows) => internal_pages::list(&Look::current(), ListKind::History, &rows),
+                Err(error) => {
+                    internal_pages::unavailable(&Look::current(), "History", &error.to_string())
+                }
             }),
             "bitter://bookmarks" => Some(match self.bookmarks.get_all() {
-                Ok(rows) => internal_list_page(
-                    "Bookmarks",
-                    "Saved pages",
-                    &rows,
-                    "Bookmarks will appear here after you save pages with Ctrl+D.",
-                ),
-                Err(error) => unavailable_list_page("Bookmarks", &error.to_string()),
+                Ok(rows) => internal_pages::list(&Look::current(), ListKind::Bookmarks, &rows),
+                Err(error) => {
+                    internal_pages::unavailable(&Look::current(), "Bookmarks", &error.to_string())
+                }
             }),
             _ => None,
         };
@@ -854,6 +920,7 @@ impl Browser {
                 webkit6::LoadEvent::Committed => {
                     if let Some(uri) = web.uri() {
                         tab.update(&uri, &uri);
+                        web.set_zoom_level(browser.saved_zoom(&uri));
                     }
                 }
                 webkit6::LoadEvent::Finished if !view.failed.get() => {
@@ -911,6 +978,7 @@ impl Browser {
                 let view = tab.view.get().expect("view attached before loading");
                 *view.requested.borrow_mut() = uri.to_owned();
                 tab.update(uri, uri);
+                view.certificate_failed.set(true);
                 view.show_problem(
                     "Secure connection failed",
                     "The site's certificate could not be verified.",
@@ -1096,7 +1164,14 @@ impl Browser {
     }
 
     fn display_address(&self, tab: &Tab) {
-        self.toolbar.omnibar().set_text(address_text(&tab.uri()));
+        let uri = tab.uri();
+        let omnibar = self.toolbar.omnibar();
+        omnibar.set_text(address_text(&uri));
+        let certificate_failed = tab
+            .view
+            .get()
+            .is_some_and(|view| view.certificate_failed.get());
+        omnibar.set_security(Security::for_address(&uri, certificate_failed));
     }
 
     fn display_active_address(&self, tab: &Tab) {
@@ -1200,6 +1275,14 @@ enum Target {
 const ZOOM_LEVELS: [f64; 13] = [
     0.3, 0.5, 0.67, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0,
 ];
+
+/// The site key for remembered zoom: the host of web addresses only.
+fn zoom_host(uri: &str) -> Option<String> {
+    let url = url::Url::parse(uri).ok()?;
+    matches!(url.scheme(), "http" | "https")
+        .then(|| url.host_str().map(str::to_ascii_lowercase))
+        .flatten()
+}
 
 /// Returns the next preset zoom level above or below `current`.
 fn next_zoom(current: f64, zoom_in: bool) -> f64 {
@@ -1311,182 +1394,6 @@ fn navigation_target(input: &str, engine: SearchEngine) -> Result<Option<Target>
     }
     Ok(Some(Target::Search(engine.search_url(input))))
 }
-fn unavailable_list_page(title: &str, error: &str) -> String {
-    internal_page_shell(
-        title,
-        &format!(
-            r#"<section class="empty"><h2>Could not load this list</h2><p>Check available disk space and profile permissions, then try again.</p><p>{}</p></section>"#,
-            escape_html(error),
-        ),
-    )
-}
-
-fn internal_list_page(
-    title: &str,
-    heading: &str,
-    rows: &[(String, String)],
-    empty_message: &str,
-) -> String {
-    let body = if rows.is_empty() {
-        format!(
-            r#"<section class="empty"><h2>{}</h2><p>{}</p></section>"#,
-            escape_html(heading),
-            escape_html(empty_message)
-        )
-    } else {
-        let items = rows
-            .iter()
-            .map(|(url, title)| {
-                let label = if title.trim().is_empty() { url } else { title };
-                format!(
-                    r#"<a class="row" href="{url}">
-                        <span class="title">{title}</span>
-                        <span class="url">{url}</span>
-                    </a>"#,
-                    url = escape_html(url),
-                    title = escape_html(label)
-                )
-            })
-            .collect::<String>();
-
-        format!(
-            r#"<section><h2>{}</h2><div class="list">{}</div></section>"#,
-            escape_html(heading),
-            items
-        )
-    };
-
-    internal_page_shell(title, &body)
-}
-
-fn internal_page_shell(title: &str, body: &str) -> String {
-    format!(
-        r#"<!doctype html>
-<html class="{theme}">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{title}</title>
-  <style>
-    :root {{
-    color-scheme: light dark;
-    font-family: system-ui, sans-serif;
-    --surface: #ffffff;
-    --outline: #d9d9dc;
-    --hover: #f2f2f5;
-    --secondary: #54545d;
-    background: #f6f6f8;
-    color: #202026;
-  }}
-  :root.dark {{
-    --surface: #232327;
-    --outline: #3a3a41;
-    --hover: #2e2e35;
-    --secondary: #b5b5c0;
-    background: #19191d;
-    color: #f0f0f2;
-  }}
-  body {{
-    margin: 0;
-    padding: clamp(20px, 5vw, 48px);
-  }}
-  main {{
-      max-width: 880px;
-      margin: 0 auto;
-    }}
-    h1 {{
-      margin: 0 0 28px;
-      font-size: 28px;
-      font-weight: 650;
-    }}
-    h2 {{
-      margin: 0 0 16px;
-      font-size: 16px;
-      font-weight: 650;
-      }}
-    p {{
-      margin: 0;
-      color: var(--secondary);
-    }}
-    p + p {{
-    margin-top: 12px;
-  }}
-  kbd {{
-    padding: 2px 5px;
-    border: 1px solid var(--outline);
-    border-radius: 4px;
-  }}
-  .list {{
-      display: grid;
-      gap: 1px;
-      overflow: hidden;
-      border: 1px solid var(--outline);
-      border-radius: 8px;
-      background: var(--outline);
-    }}
-    .row {{
-      display: grid;
-      gap: 4px;
-      padding: 12px 14px;
-      color: inherit;
-      text-decoration: none;
-      background: var(--surface);
-    }}
-    .row:hover {{
-      background: var(--hover);
-    }}
-    .title {{
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-size: 14px;
-    }}
-    .url {{
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: var(--secondary);
-      font-size: 12px;
-    }}
-    .empty {{
-      padding: 32px;
-      border: 1px solid var(--outline);
-      border-radius: 8px;
-      background: var(--surface);
-    }}
-  </style>
-</head>
-<body>
-  <main>
-    <h1>{title}</h1>
-    {body}
-  </main>
-</body>
-</html>"#,
-        title = escape_html(title),
-        theme = if adw::StyleManager::default().is_dark() {
-            "dark"
-        } else {
-            "light"
-        },
-        body = body
-    )
-}
-
-fn escape_html(input: &str) -> String {
-    let mut escaped = String::with_capacity(input.len());
-    for ch in input.chars() {
-        match ch {
-            '&' => escaped.push_str("&amp;"),
-            '<' => escaped.push_str("&lt;"),
-            '>' => escaped.push_str("&gt;"),
-            '"' => escaped.push_str("&quot;"),
-            '\'' => escaped.push_str("&#39;"),
-            _ => escaped.push(ch),
-        }
-    }
-    escaped
-}
 
 #[cfg(test)]
 mod tests {
@@ -1501,6 +1408,21 @@ mod tests {
         assert_eq!(next_zoom(3.0, true), 3.0);
         assert_eq!(next_zoom(0.3, false), 0.3);
         assert_eq!(next_zoom(5.0, false), 3.0);
+    }
+
+    #[test]
+    fn zoom_is_remembered_per_web_host_only() {
+        assert_eq!(
+            zoom_host("https://Docs.Example.test/a?b").as_deref(),
+            Some("docs.example.test")
+        );
+        assert_eq!(
+            zoom_host("http://127.0.0.1:8080/x").as_deref(),
+            Some("127.0.0.1")
+        );
+        assert_eq!(zoom_host("bitter://history"), None);
+        assert_eq!(zoom_host("file:///tmp/a.html"), None);
+        assert_eq!(zoom_host("not a url"), None);
     }
 
     #[test]

@@ -14,7 +14,7 @@ impl Workspace {
             .margin_start(12)
             .margin_end(12)
             .margin_top(10)
-            .margin_bottom(10)
+            .margin_bottom(8)
             .css_classes(["linked", "workspace-switcher"])
             .build();
         let buttons = ["Main", "Second"].map(|label| {

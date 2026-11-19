@@ -21,6 +21,13 @@ impl Toolbar {
         let actions = actions::Actions::new();
         let omnibar = omnibar::Omnibar::new();
 
+        let sidebar = gtk4::Button::builder()
+            .icon_name("sidebar-show-symbolic")
+            .tooltip_text("Toggle sidebar (F9)")
+            .action_name("win.toggle_sidebar")
+            .build();
+        sidebar.update_property(&[gtk4::accessible::Property::Label("Toggle sidebar")]);
+        header.pack_start(&sidebar);
         header.pack_start(actions.widget());
         let preferences = gtk4::Button::builder()
             .icon_name("emblem-system-symbolic")
@@ -34,7 +41,6 @@ impl Toolbar {
             .css_classes(["navigation-progress"])
             .build();
         progress.update_property(&[gtk4::accessible::Property::Label("Page loading progress")]);
-        progress.set_opacity(0.0);
         progress.update_state(&[gtk4::accessible::State::Hidden(true)]);
         container.append(&header);
         container.append(&progress);
@@ -66,7 +72,11 @@ impl Toolbar {
         let state = (back, forward, loading);
         if self.navigation.replace(Some(state)) != Some(state) {
             self.actions.refresh(back, forward, loading);
-            self.progress.set_opacity(if loading { 1.0 } else { 0.0 });
+            if loading {
+                self.progress.add_css_class("loading");
+            } else {
+                self.progress.remove_css_class("loading");
+            }
             self.progress
                 .update_state(&[gtk4::accessible::State::Hidden(!loading)]);
         }

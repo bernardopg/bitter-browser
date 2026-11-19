@@ -84,6 +84,16 @@ fn build_dialog(state: &PreferenceState) -> adw::PreferencesDialog {
     startup.add(&restore);
     page.add(&startup);
 
+    let downloads = adw::PreferencesGroup::builder().title("Downloads").build();
+    let ask_location = adw::SwitchRow::builder()
+        .title("Ask where to save each file")
+        .subtitle("Otherwise files go to your downloads folder")
+        .active(active.ask_download_location)
+        .sensitive(load_issue.is_none())
+        .build();
+    downloads.add(&ask_location);
+    page.add(&downloads);
+
     let appearance = adw::PreferencesGroup::builder().title("Appearance").build();
     let theme = adw::ComboRow::builder()
         .title("Color scheme")
@@ -118,26 +128,22 @@ fn build_dialog(state: &PreferenceState) -> adw::PreferencesDialog {
     );
 
     if load_issue.is_none() {
-        let state_for_restore = state.clone();
-        let weak_dialog = dialog.downgrade();
-        let weak_status = status.downgrade();
-        restore.connect_active_notify(move |row| {
-            let (Some(dialog), Some(status)) = (weak_dialog.upgrade(), weak_status.upgrade())
-            else {
-                return;
-            };
-            let previous = current(&state_for_restore);
-            if row.is_active() == previous.restore_session {
-                return;
-            }
-            let next = Preferences {
-                restore_session: row.is_active(),
-                ..previous
-            };
-            if !save(&state_for_restore, &dialog, &status, next) {
-                row.set_active(previous.restore_session);
-            }
-        });
+        connect_switch(
+            &restore,
+            &dialog,
+            &status,
+            state,
+            |prefs| prefs.restore_session,
+            |prefs, value| prefs.restore_session = value,
+        );
+        connect_switch(
+            &ask_location,
+            &dialog,
+            &status,
+            state,
+            |prefs| prefs.ask_download_location,
+            |prefs, value| prefs.ask_download_location = value,
+        );
         connect_setting(
             &search,
             &dialog,
@@ -158,6 +164,33 @@ fn build_dialog(state: &PreferenceState) -> adw::PreferencesDialog {
         );
     }
     dialog
+}
+
+fn connect_switch(
+    row: &adw::SwitchRow,
+    dialog: &adw::PreferencesDialog,
+    status: &adw::Banner,
+    state: &PreferenceState,
+    get: fn(&Preferences) -> bool,
+    set: fn(&mut Preferences, bool),
+) {
+    let state = state.clone();
+    let weak_dialog = dialog.downgrade();
+    let weak_status = status.downgrade();
+    row.connect_active_notify(move |row| {
+        let (Some(dialog), Some(status)) = (weak_dialog.upgrade(), weak_status.upgrade()) else {
+            return;
+        };
+        let previous = current(&state);
+        if row.is_active() == get(&previous) {
+            return;
+        }
+        let mut next = previous;
+        set(&mut next, row.is_active());
+        if !save(&state, &dialog, &status, next) {
+            row.set_active(get(&previous));
+        }
+    });
 }
 
 fn index_of<T: PartialEq>(values: &[T], value: T) -> u32 {
@@ -304,14 +337,11 @@ mod tests {
         );
 
         let switches = children_of::<adw::SwitchRow>(dialog.upcast_ref());
-        assert_eq!(switches.len(), 1);
+        assert_eq!(switches.len(), 2);
         switches[0].set_active(false);
-        assert!(
-            !ConfigStore::open(path.clone())
-                .unwrap()
-                .current()
-                .restore_session
-        );
+        switches[1].set_active(true);
+        let saved = ConfigStore::open(path.clone()).unwrap().current();
+        assert!(!saved.restore_session && saved.ask_download_location);
 
         // Simulate an editor saving while the dialog is open.
         let edited = b"[appearance]\ntheme = 'light'";
