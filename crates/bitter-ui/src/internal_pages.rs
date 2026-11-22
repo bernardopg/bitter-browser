@@ -487,7 +487,10 @@ mod tests {
         assert_eq!(site_name("localhost"), "localhost");
         assert_eq!(site_name(""), "");
         assert_eq!(display_host("http://www.Example.test/path"), "example.test");
-        assert_eq!(display_host("https://sub.example.test/path"), "sub.example.test");
+        assert_eq!(
+            display_host("https://sub.example.test/path"),
+            "sub.example.test"
+        );
         assert_eq!(display_host("not a url"), "not a url");
     }
 }
