@@ -64,7 +64,7 @@ fails, the dialog reports the durability problem.
 ```sh
 cargo test --workspace --locked
 GTK_A11Y=none GDK_BACKEND=x11 GSK_RENDERER=cairo \
-  xvfb-run -a dbus-run-session -- \
+  scripts/headless-session.sh -- \
   cargo test -p bitter-ui --locked settings_widgets_save_restore_and_report_errors -- --ignored
 ```
 
