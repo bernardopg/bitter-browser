@@ -255,4 +255,18 @@ mod tests {
         ));
         assert!(webkit_path(Path::new("/tmp/bitter")).is_ok());
     }
+
+    #[test]
+    fn reports_create_dir_failures() {
+        let root = tempfile::tempdir().unwrap();
+        let base = root.path().join("readonly");
+        fs::create_dir(&base).unwrap();
+        let mut perms = fs::metadata(&base).unwrap().permissions();
+        std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o500);
+        fs::set_permissions(&base, perms.clone()).unwrap();
+        let result = Profile::open_at(&base, root.path(), root.path());
+        std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o700);
+        fs::set_permissions(&base, perms).unwrap();
+        assert!(result.is_err());
+    }
 }

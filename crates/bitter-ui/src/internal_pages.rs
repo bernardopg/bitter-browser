@@ -449,4 +449,13 @@ mod tests {
         assert_eq!(site_name("one"), "one");
         assert_eq!(site_name("a.b"), "a");
     }
+
+    #[test]
+    fn unavailable_page_escapes_user_visible_error() {
+        let html = unavailable(&Look::default(), "History", "<broken &>");
+        assert!(html.contains("History"));
+        assert!(html.contains("Could not load this list"));
+        assert!(html.contains("&lt;broken &amp;&gt;"));
+        assert!(!html.contains("<broken &>"));
+    }
 }
