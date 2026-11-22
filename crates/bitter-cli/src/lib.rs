@@ -195,6 +195,10 @@ mod tests {
     #[test]
     fn browser_binary_honors_override() {
         let _guard = ENV_LOCK.lock().unwrap();
+        let real_old = std::env::var_os("BITTER_BROWSER_BIN");
+        unsafe {
+            std::env::set_var("BITTER_BROWSER_BIN", "/tmp/sentinel-bitter-ui");
+        }
         let old = std::env::var_os("BITTER_BROWSER_BIN");
         unsafe {
             std::env::set_var("BITTER_BROWSER_BIN", "/tmp/fake-bitter-ui");
@@ -205,12 +209,20 @@ mod tests {
                 Some(value) => std::env::set_var("BITTER_BROWSER_BIN", value),
                 None => std::env::remove_var("BITTER_BROWSER_BIN"),
             }
+            match real_old {
+                Some(value) => std::env::set_var("BITTER_BROWSER_BIN", value),
+                None => std::env::remove_var("BITTER_BROWSER_BIN"),
+            }
         }
     }
 
     #[test]
     fn run_reports_launch_errors() {
         let _guard = ENV_LOCK.lock().unwrap();
+        let real_old = std::env::var_os("BITTER_BROWSER_BIN");
+        unsafe {
+            std::env::set_var("BITTER_BROWSER_BIN", "/tmp/sentinel-bitter-ui");
+        }
         let old = std::env::var_os("BITTER_BROWSER_BIN");
         unsafe {
             std::env::set_var("BITTER_BROWSER_BIN", "/definitely/missing/bitter-ui");
@@ -218,6 +230,10 @@ mod tests {
         assert_eq!(run(["bitter-cli", "https://example.test"]), 1);
         unsafe {
             match old {
+                Some(value) => std::env::set_var("BITTER_BROWSER_BIN", value),
+                None => std::env::remove_var("BITTER_BROWSER_BIN"),
+            }
+            match real_old {
                 Some(value) => std::env::set_var("BITTER_BROWSER_BIN", value),
                 None => std::env::remove_var("BITTER_BROWSER_BIN"),
             }
@@ -229,5 +245,60 @@ mod tests {
         assert_eq!(run(["bitter-cli", "--help"]), 0);
         assert_eq!(run(["bitter-cli", "--version"]), 0);
         assert_eq!(run(["bitter-cli", "--bogus"]), 2);
+    }
+
+    #[test]
+    fn browser_binary_falls_back_without_override() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let real_old = std::env::var_os("BITTER_BROWSER_BIN");
+        unsafe {
+            std::env::set_var("BITTER_BROWSER_BIN", "/tmp/sentinel-bitter-ui");
+        }
+        let old = std::env::var_os("BITTER_BROWSER_BIN");
+        unsafe {
+            std::env::remove_var("BITTER_BROWSER_BIN");
+        }
+        let binary = browser_binary();
+        // With no override and no sibling next to the test binary, fall back to the name.
+        assert!(
+            binary.as_path() == std::path::Path::new("bitter-ui") || binary.ends_with("bitter-ui"),
+            "{binary:?}"
+        );
+        unsafe {
+            match old {
+                Some(value) => std::env::set_var("BITTER_BROWSER_BIN", value),
+                None => std::env::remove_var("BITTER_BROWSER_BIN"),
+            }
+            match real_old {
+                Some(value) => std::env::set_var("BITTER_BROWSER_BIN", value),
+                None => std::env::remove_var("BITTER_BROWSER_BIN"),
+            }
+        }
+    }
+
+    #[test]
+    fn run_launches_configured_binary_and_defaults_program_name() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let real_old = std::env::var_os("BITTER_BROWSER_BIN");
+        unsafe {
+            std::env::set_var("BITTER_BROWSER_BIN", "/tmp/sentinel-bitter-ui");
+        }
+        let old = std::env::var_os("BITTER_BROWSER_BIN");
+        unsafe {
+            std::env::set_var("BITTER_BROWSER_BIN", "/bin/true");
+        }
+        // Empty args exercises the default program name; /bin/true exercises success path.
+        assert_eq!(run(std::iter::empty::<&str>()), 0);
+        assert_eq!(run(["bitter-cli"]), 0);
+        unsafe {
+            match old {
+                Some(value) => std::env::set_var("BITTER_BROWSER_BIN", value),
+                None => std::env::remove_var("BITTER_BROWSER_BIN"),
+            }
+            match real_old {
+                Some(value) => std::env::set_var("BITTER_BROWSER_BIN", value),
+                None => std::env::remove_var("BITTER_BROWSER_BIN"),
+            }
+        }
     }
 }
