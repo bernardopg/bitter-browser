@@ -833,4 +833,113 @@ mod tests {
         // Both party filters in one rule cannot be expressed.
         assert_eq!(convert("||a.test^$script,~image", Scope::Full).rules, 0);
     }
+
+    #[test]
+    fn options_cover_all_supported_types_and_modifiers() {
+        let rules = rules(
+            "||a.test^$first-party,font,media,popup,important,all\n\
+             ||b.test^$1p\n\
+             ||c.test^$~subdocument\n\
+             ||d.test^$~object\n",
+        );
+        assert_eq!(rules[0]["trigger"]["load-type"], json!(["first-party"]));
+        assert_eq!(
+            rules[0]["trigger"]["resource-type"],
+            json!(["font", "media", "popup"])
+        );
+        assert_eq!(rules[1]["trigger"]["load-type"], json!(["first-party"]));
+        // ~subdocument with no other types means "everything but document child frames".
+        let mut actual = rules[2]["trigger"]["resource-type"]
+            .as_array()
+            .unwrap()
+            .clone();
+        actual.sort_by_key(|value| value.as_str().unwrap().to_owned());
+        let mut expected: Vec<_> = RESOURCE_TYPES.iter().map(|value| json!(value)).collect();
+        expected.sort_by_key(|value| value.as_str().unwrap().to_owned());
+        assert_eq!(actual, expected);
+        assert!(
+            rules[2]["trigger"]
+                .get("load-context")
+                .is_none_or(|value| value != &json!(["child-frame"]))
+        );
+        // A negated object type is ignored; a positive object type is unsupported.
+        assert_eq!(rules[3]["trigger"].get("resource-type"), None);
+        assert_eq!(convert("||e.test^$object", Scope::Full).rules, 0);
+        assert_eq!(convert("||f.test^$object-subrequest", Scope::Full).rules, 0);
+    }
+
+    #[test]
+    fn cosmetic_edge_cases_are_counted_or_dropped() {
+        // Unsupported selector in a cosmetic rule is skipped.
+        let conversion = convert("##+js(abort-on-property-read, x)\n", Scope::Full);
+        assert_eq!(conversion.rules, 0);
+        assert_eq!(conversion.skipped, 1);
+
+        // A hiding exception with both include and exclude domains is unsupported.
+        let conversion = convert("a.test,~b.test#@#.ad\n", Scope::Full);
+        assert_eq!(conversion.rules, 0);
+        assert_eq!(conversion.skipped, 1);
+
+        // Domains containing '/' or '#' in the cosmetic domain part are not cosmetics.
+        let conversion = convert("foo/bar##.ad\na#b##.ad\n", Scope::Full);
+        assert_eq!(conversion.rules, 0);
+        assert_eq!(conversion.skipped, 2);
+
+        // A negated domain= option is rejected.
+        assert_eq!(convert("||a.test^$~domain=x.test", Scope::Full).rules, 0);
+        // Excluded domains in a domain= option are accepted.
+        let rules = rules("||a.test^$domain=~x.test\n");
+        assert_eq!(rules[0]["trigger"]["unless-domain"], json!(["*x.test"]));
+    }
+
+    #[test]
+    fn large_batches_and_rule_limits_are_handled() {
+        // SELECTORS_PER_RULE + 1 generic selectors force a batch flush.
+        let mut list = String::new();
+        for index in 0..(SELECTORS_PER_RULE + 1) {
+            list.push_str(&format!("##.ad-{index}\n"));
+        }
+        let conversion = convert(&list, Scope::Full);
+        let rules: Vec<Value> = serde_json::from_str(&conversion.json).unwrap();
+        assert_eq!(conversion.skipped, 0);
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[0]["action"]["type"], "css-display-none");
+
+        // Rules beyond MAX_RULES are counted as skipped.
+        let mut many = String::new();
+        for index in 0..(MAX_RULES + 1) {
+            many.push_str(&format!("||block{index}.test^\n"));
+        }
+        let conversion = convert(&many, Scope::Full);
+        assert_eq!(conversion.rules, MAX_RULES);
+        assert_eq!(conversion.skipped, 1);
+    }
+
+    #[test]
+    fn url_filter_collapses_wildcards_and_rejects_unsupported_chars() {
+        assert_eq!(url_filter("a**b", false), Some("a.*b".to_string()));
+        // Non-graphic characters are rejected.
+        assert_eq!(url_filter("a b", false), None);
+        assert_eq!(url_filter("a\nb", false), None);
+    }
+
+    #[test]
+    fn remaining_option_and_cosmetic_branches() {
+        // Unsupported selector in a cosmetic rule increments skipped.
+        let conversion = convert("##+js(abort-on-property-read, x)\n", Scope::Full);
+        assert_eq!(conversion.skipped, 1);
+
+        // document option is accepted.
+        let doc_rules = rules("@@||trusted.test^$document\n@@||other.test^$doc\n");
+        assert_eq!(doc_rules[0]["action"]["type"], "ignore-previous-rules");
+        assert_eq!(doc_rules[1]["action"]["type"], "ignore-previous-rules");
+
+        // subdocument mixed with other types is accepted (frames left to other filters).
+        let mixed_rules = rules("||a.test^$script,subdocument\n");
+        assert_eq!(
+            mixed_rules[0]["trigger"]["resource-type"],
+            json!(["script"])
+        );
+        assert!(mixed_rules[0]["trigger"].get("load-context").is_none());
+    }
 }
