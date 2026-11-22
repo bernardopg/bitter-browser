@@ -157,22 +157,61 @@ mod tests {
 
     #[test]
     fn stock_actions_get_english_labels() {
-        assert_eq!(label(ContextMenuAction::OpenLink), Some("Open Link"));
-        assert_eq!(
-            label(ContextMenuAction::DownloadLinkToDisk),
-            Some("Download Linked File")
-        );
-        assert_eq!(
-            label(ContextMenuAction::CopyLinkToClipboard),
-            Some("Copy Link")
-        );
-        assert_eq!(
-            label(ContextMenuAction::InspectElement),
-            Some("Inspect Element")
-        );
-        assert_eq!(label(ContextMenuAction::MediaPlay), Some("Play"));
-        assert_eq!(label(ContextMenuAction::MediaPause), Some("Pause"));
-        assert_eq!(label(ContextMenuAction::InsertEmoji), Some("Insert Emoji"));
-        assert_eq!(label(ContextMenuAction::OpenFrameInNewWindow), None);
+        for (action, expected) in [
+            (ContextMenuAction::OpenLink, "Open Link"),
+            (
+                ContextMenuAction::DownloadLinkToDisk,
+                "Download Linked File",
+            ),
+            (ContextMenuAction::CopyLinkToClipboard, "Copy Link"),
+            (ContextMenuAction::DownloadImageToDisk, "Save Image As…"),
+            (ContextMenuAction::CopyImageToClipboard, "Copy Image"),
+            (
+                ContextMenuAction::CopyImageUrlToClipboard,
+                "Copy Image Address",
+            ),
+            (ContextMenuAction::GoBack, "Back"),
+            (ContextMenuAction::GoForward, "Forward"),
+            (ContextMenuAction::Stop, "Stop"),
+            (ContextMenuAction::Reload, "Reload"),
+            (ContextMenuAction::Copy, "Copy"),
+            (ContextMenuAction::Cut, "Cut"),
+            (ContextMenuAction::Paste, "Paste"),
+            (ContextMenuAction::PasteAsPlainText, "Paste as Plain Text"),
+            (ContextMenuAction::Delete, "Delete"),
+            (ContextMenuAction::SelectAll, "Select All"),
+            (ContextMenuAction::InsertEmoji, "Insert Emoji"),
+            (ContextMenuAction::InspectElement, "Inspect Element"),
+            (ContextMenuAction::NoGuessesFound, "No Guesses Found"),
+            (ContextMenuAction::IgnoreSpelling, "Ignore Spelling"),
+            (ContextMenuAction::LearnSpelling, "Add to Dictionary"),
+            (ContextMenuAction::IgnoreGrammar, "Ignore Grammar"),
+            (ContextMenuAction::Bold, "Bold"),
+            (ContextMenuAction::Italic, "Italic"),
+            (ContextMenuAction::Underline, "Underline"),
+            (
+                ContextMenuAction::CopyVideoLinkToClipboard,
+                "Copy Video Address",
+            ),
+            (
+                ContextMenuAction::CopyAudioLinkToClipboard,
+                "Copy Audio Address",
+            ),
+            (ContextMenuAction::DownloadVideoToDisk, "Download Video"),
+            (ContextMenuAction::DownloadAudioToDisk, "Download Audio"),
+            (ContextMenuAction::EnterVideoFullscreen, "Full Screen"),
+            (ContextMenuAction::MediaPlay, "Play"),
+            (ContextMenuAction::MediaPause, "Pause"),
+            (ContextMenuAction::MediaMute, "Mute"),
+        ] {
+            assert_eq!(label(action), Some(expected), "{action:?}");
+        }
+        for action in [
+            ContextMenuAction::OpenFrameInNewWindow,
+            ContextMenuAction::OpenLinkInNewWindow,
+            ContextMenuAction::OpenImageInNewWindow,
+        ] {
+            assert_eq!(label(action), None, "{action:?}");
+        }
     }
 }
