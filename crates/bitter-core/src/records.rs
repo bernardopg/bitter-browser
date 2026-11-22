@@ -695,4 +695,26 @@ mod tests {
             Some(false)
         );
     }
+
+    #[test]
+    fn forget_missing_zoom_is_a_noop() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut zoom, _) = ZoomLevels::open(dir.path().join("zoom.json"));
+        zoom.forget("missing.test").unwrap();
+        assert_eq!(zoom.get("missing.test"), None);
+    }
+
+    #[test]
+    fn record_load_rejects_directories_and_oversized_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().join("zoom.json");
+        std::fs::create_dir(&dir_path).unwrap();
+        let (_, err) = ZoomLevels::open(dir_path);
+        assert!(err.is_some());
+
+        let big_path = dir.path().join("downloads.json");
+        std::fs::write(&big_path, vec![b' '; MAX_BYTES + 1]).unwrap();
+        let (_, err) = DownloadList::open(big_path);
+        assert!(err.is_some());
+    }
 }
