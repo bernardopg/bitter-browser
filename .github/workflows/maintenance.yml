@@ -1,0 +1,76 @@
+name: Branch cleanup and main verification
+# Metadata only: this workflow never checks out or runs repository code.
+#
+# Merges made by auto-merge use GITHUB_TOKEN, and GitHub does not start
+# workflows for events caused by GITHUB_TOKEN: no `closed` event, no push to
+# main. Repository auto-delete is skipped for those merges too. This scheduled
+# job deletes the head branch of every merged pull request and starts CI and
+# CodeQL for a main commit that has not been checked yet.
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: maintenance
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    name: Delete merged branches
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Delete head branches of merged pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          DEFAULT_BRANCH=$(gh api "repos/$GH_REPO" --jq .default_branch)
+          gh pr list --state merged --limit 200 \
+            --json headRefName,isCrossRepository \
+            --jq '.[] | select(.isCrossRepository | not) | .headRefName' |
+          sort -u | while IFS= read -r branch; do
+            [ -n "$branch" ] && [ "$branch" != "$DEFAULT_BRANCH" ] || continue
+            gh api "repos/$GH_REPO/git/ref/heads/$branch" >/dev/null 2>&1 || continue
+            open=$(gh pr list --state open --head "$branch" --json number --jq length)
+            if [ "$open" != 0 ]; then
+              echo "Keeping $branch: an open pull request still uses it"
+              continue
+            fi
+            # Only delete a branch whose tip is already part of the default
+            # branch, so commits pushed after the merge are never lost.
+            status=$(gh api "repos/$GH_REPO/compare/$DEFAULT_BRANCH...$branch" --jq .status)
+            case "$status" in
+              behind|identical)
+                gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$branch"
+                echo "Deleted $branch" ;;
+              *)
+                echo "::warning::Keeping $branch: it has commits that are not on $DEFAULT_BRANCH ($status)" ;;
+            esac
+          done
+
+  verify-main:
+    name: Check the newest main commit
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Start CI and CodeQL when main has not been checked
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          DEFAULT_BRANCH=$(gh api "repos/$GH_REPO" --jq .default_branch)
+          sha=$(gh api "repos/$GH_REPO/commits/$DEFAULT_BRANCH" --jq .sha)
+          for workflow in ci.yml codeql.yml; do
+            runs=$(gh run list --workflow "$workflow" --commit "$sha" --json databaseId --jq length)
+            if [ "$runs" = 0 ]; then
+              gh workflow run "$workflow" --ref "$DEFAULT_BRANCH"
+              echo "Started $workflow for $sha"
+            fi
+          done
