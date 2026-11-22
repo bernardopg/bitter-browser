@@ -7,6 +7,12 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+
+- Updated `url` to 2.5.9 for RUSTSEC-2026-0592 (stack overflow in
+  `Url::origin()` on nested `blob:` URLs). Bitter only calls `origin()` on
+  `http` and `https` addresses, so the advisory was not reachable.
+
 ### Fixed
 
 - Addresses with embedded credentials (`user:pass@`) are no longer recorded in
