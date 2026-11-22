@@ -12,15 +12,15 @@ custom_target(
   'cargo-build',
   build_by_default: true,
   build_always_stale: true,
-  output: ['bitter-ui'],
+  output: ['bitter-ui', 'bitter-cli'],
   console: true,
   install: true,
   install_dir: get_option('bindir'),
   command: [
     'sh', '-c',
-    'CARGO_TARGET_DIR="$1" "$2" build --locked --release --manifest-path "$3" --bin bitter-ui && cp "$1/release/bitter-ui" "$4"',
+    'CARGO_TARGET_DIR="$1" "$2" build --locked --release --manifest-path "$3" --bin bitter-ui --bin bitter-cli && cp "$1/release/bitter-ui" "$4" && cp "$1/release/bitter-cli" "$5"',
     'sh', meson.project_build_root() / 'cargo-target', cargo,
-    meson.project_source_root() / 'Cargo.toml', '@OUTPUT@',
+    meson.project_source_root() / 'Cargo.toml', '@OUTPUT0@', '@OUTPUT1@',
   ]
 )
 
