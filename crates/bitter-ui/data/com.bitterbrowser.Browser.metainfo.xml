@@ -52,6 +52,19 @@
     <category>WebBrowser</category>
   </categories>
   <releases>
+    <release version="0.4.0" date="2026-11-22">
+      <url type="details">https://github.com/bernardopg/bitter-browser/releases/tag/v0.4.0</url>
+      <description>
+        <p>A command-line launcher, removing single pages from history and reliability fixes.</p>
+        <ul>
+          <li>Remove a single page from the History page</li>
+          <li>The bitter-cli launcher opens addresses from scripts and terminals</li>
+          <li>Addresses with a user name and password are no longer saved in history</li>
+          <li>Switching or moving tabs in an empty workspace no longer crashes the browser</li>
+          <li>Downloaded filter lists larger than 8 MiB are rejected</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-11-19">
       <url type="details">https://github.com/bernardopg/bitter-browser/releases/tag/v0.3.0</url>
       <description>

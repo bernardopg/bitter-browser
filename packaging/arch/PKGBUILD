@@ -1,7 +1,7 @@
 # Maintainer: Bitter Browser Contributors <https://github.com/bernardopg/bitter-browser>
 # Release package: builds the tagged source archive.
 pkgname=bitter-browser
-pkgver=0.3.0
+pkgver=0.4.0
 pkgrel=1
 pkgdesc='Focused, native web browser for the Linux desktop'
 arch=('x86_64')

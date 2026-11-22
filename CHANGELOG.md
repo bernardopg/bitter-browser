@@ -7,11 +7,28 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-22
+
+### Added
+
+- Remove a single page from history with the × button on its row of the
+  History page (`bitter://history`). Only the History page itself can
+  trigger the removal; links on web pages cannot.
+- `bitter-cli`, a launcher installed next to `bitter-ui` by Meson, the
+  Flatpak and the Arch packages. It accepts `-h`/`--help` and
+  `-v`/`--version`, rejects unknown options with exit code 2 and passes
+  addresses (and everything after `--`) to `bitter-ui`, returning its exit
+  code. `BITTER_BROWSER_BIN` overrides the browser it runs.
+- `AGENTS.md` and `CLAUDE.md` with the checks to run before pushing and the
+  rule that merged branches are deleted on GitHub and locally.
+
 ### Security
 
 - Updated `url` to 2.5.9 for RUSTSEC-2026-0592 (stack overflow in
   `Url::origin()` on nested `blob:` URLs). Bitter only calls `origin()` on
   `http` and `https` addresses, so the advisory was not reachable.
+- Downloaded filter lists larger than 8 MiB are rejected before they are
+  read into memory.
 
 ### Fixed
 
@@ -22,8 +39,14 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 ### Changed
 
-- Expanded the test suite from 58 to 104 tests; line coverage is 40.24%
-  (`cargo llvm-cov`), up from 32.7%.
+- An hourly maintenance workflow deletes the branches of merged pull
+  requests and starts CI and CodeQL on `main` after automatic merges, which
+  start no workflows by themselves.
+- Fixed intermittent CI failures: WebKit unit tests no longer share the GLib
+  main context across test threads, and the smoke test waits for history
+  writes and retries window focus.
+- Expanded the test suite from 58 to 158 tests; line coverage is 46.77%
+  (`cargo llvm-cov`), up from 32.7% in 0.3.0.
 
 ## [0.3.0] - 2026-11-19
 
@@ -127,6 +150,7 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 - Meson installation of the executable and the application icon.
 
+[0.4.0]: https://github.com/bernardopg/bitter-browser/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bernardopg/bitter-browser/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/bernardopg/bitter-browser/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/bernardopg/bitter-browser/compare/v0.1.1...v0.2.0

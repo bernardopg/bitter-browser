@@ -9,8 +9,8 @@ TEST-04; it does not define a production quality gate by itself.
 - Tool: `cargo llvm-cov`.
 - Scope: workspace Rust tests run by CI (`cargo llvm-cov --workspace --all-targets --locked --lcov --output-path lcov.info`).
 - Artifact: `lcov.info` uploaded by CI with a 14-day retention.
-- Current baseline: 40.24% line coverage of instrumented automated tests
-  (2026-11-19, as recorded in `TASKS.md`).
+- Current measurement: 46.77% line coverage of instrumented automated tests
+  (2026-11-22, v0.4.0), up from the 40.24% baseline of 2026-11-19.
 
 ## What is not measured
 
