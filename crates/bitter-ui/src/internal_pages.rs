@@ -491,4 +491,39 @@ mod tests {
         assert!(html.contains("&lt;broken &amp;&gt;"));
         assert!(!html.contains("<broken &>"));
     }
+
+    #[test]
+    fn linkable_only_accepts_web_and_file_schemes() {
+        for url in [
+            "https://example.test/",
+            "http://example.test/",
+            "file:///tmp/page.html",
+        ] {
+            assert!(linkable(url), "{url}");
+        }
+        for url in [
+            "javascript:alert(1)",
+            "data:text/html,<h1>x</h1>",
+            "bitter://history",
+            "about:blank",
+            "mailto:test@example.test",
+            "not a url",
+        ] {
+            assert!(!linkable(url), "{url}");
+        }
+    }
+
+    #[test]
+    fn site_name_and_display_host_handle_edge_cases() {
+        assert_eq!(site_name("www.example.co.uk"), "co");
+        assert_eq!(site_name("example.com"), "example");
+        assert_eq!(site_name("localhost"), "localhost");
+        assert_eq!(site_name(""), "");
+        assert_eq!(display_host("http://www.Example.test/path"), "example.test");
+        assert_eq!(
+            display_host("https://sub.example.test/path"),
+            "sub.example.test"
+        );
+        assert_eq!(display_host("not a url"), "not a url");
+    }
 }

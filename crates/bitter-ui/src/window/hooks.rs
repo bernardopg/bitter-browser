@@ -253,4 +253,32 @@ mod tests {
         assert!(!covers("ample.com", "mail.example.com"));
         assert!(!covers("", "mail.example.com"));
     }
+
+    #[test]
+    fn visited_hosts_normalizes_dedups_and_ignores_invalid_urls() {
+        let hosts = visited_hosts(&[
+            "https://EXAMPLE.com/page".into(),
+            "http://example.com/other".into(),
+            "https://sub.example.com/".into(),
+            "ftp://files.example.com/".into(),
+            "not a url".into(),
+            "".into(),
+            "about:blank".into(),
+        ]);
+        assert_eq!(
+            hosts,
+            ["example.com", "files.example.com", "sub.example.com"]
+        );
+        assert!(visited_hosts(&[]).is_empty());
+    }
+
+    #[test]
+    fn covers_handles_case_boundaries_and_empty_values() {
+        assert!(covers("Example.COM", "mail.example.com"));
+        assert!(covers(".Example.com", "example.com"));
+        assert!(!covers("example.com", "notexample.com"));
+        assert!(!covers("example.com", "example.com.evil.test"));
+        assert!(!covers(".", "example.com"));
+        assert!(!covers("", ""));
+    }
 }

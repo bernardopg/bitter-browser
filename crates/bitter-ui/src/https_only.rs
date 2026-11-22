@@ -137,6 +137,19 @@ mod tests {
     }
 
     #[test]
+    fn local_host_detection_handles_trailing_dots() {
+        assert!(is_local("localhost."));
+        assert!(is_local("printer.local."));
+        assert!(is_local("app.home.arpa."));
+        assert!(!is_local("example.com."));
+        assert_eq!(
+            upgrade("http://localhost./", |_| false),
+            None,
+            "trailing-dot localhost should stay on http"
+        );
+    }
+
+    #[test]
     fn recognizes_the_failed_upgrade_of_a_page() {
         assert!(is_upgrade_of(
             "http://Example.com/a",
