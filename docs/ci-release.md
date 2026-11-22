@@ -40,6 +40,9 @@ in `prepare()`, build offline and run the test suite in `check()`.
    `CHANGELOG.md`.
 4. Verify the published assets with `sha256sum -c` and
    `gh attestation verify`.
+5. Write the release check record in `release-checks/vX.Y.Z.md` (ignored by
+   git) with the checks, checksums, problems found and the manual test
+   checklist; see [AGENTS.md](../AGENTS.md#release-check-records).
 
 Tags matching `v*` are protected by a repository ruleset: they cannot be
 updated or deleted, and only repository administrators can create them.

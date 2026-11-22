@@ -152,7 +152,7 @@ under Xvfb; see [daily browsing](docs/daily-browsing.md#verification).
 | [Profiles and local data](docs/profile.md) | File locations, migrations, session restore and recovery |
 | [Architecture](docs/architecture.md) | Crate layout and current scope |
 | [CI and releases](docs/ci-release.md) | Checks, coverage, branch cleanup and the release process |
-| [Agent instructions](AGENTS.md) | Checks before pushing and the merged-branch policy |
+| [Agent instructions](AGENTS.md) | Checks, tokensave, Headroom memory, branch cleanup and release check records |
 | [Roadmap](TASKS.md) | Production readiness plan |
 
 ## Contributing

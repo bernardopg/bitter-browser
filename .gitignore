@@ -59,3 +59,11 @@ Thumbs.db
 
 # Python bytecode from helper scripts
 __pycache__/
+
+# Local agent state: Headroom memories, tokensave index, Graphify output
+/.headroom/
+/.tokensave/
+/graphify-out/
+
+# Local release check records (see AGENTS.md, "Release check records")
+/release-checks/
