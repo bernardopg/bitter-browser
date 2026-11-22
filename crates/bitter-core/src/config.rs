@@ -571,4 +571,45 @@ mod tests {
         assert_eq!(Theme::Light.label(), "Light");
         assert_eq!(Theme::Dark.label(), "Dark");
     }
+
+    #[test]
+    fn rejects_invalid_utf8_and_non_regular_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, [0xff, 0xfe, 0x00]).unwrap();
+        assert!(matches!(
+            ConfigStore::open(path.clone()),
+            Err(ConfigError {
+                source: ConfigFailure::Syntax(_),
+                ..
+            })
+        ));
+
+        fs::remove_file(&path).unwrap();
+        fs::create_dir(&path).unwrap();
+        assert!(ConfigStore::open(path).is_err());
+    }
+
+    #[test]
+    fn rejects_unreadable_config_files() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "version = 1").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+        let result = ConfigStore::open(path.clone());
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn save_rejects_oversized_serialized_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let filler = "a".repeat(MAX_BYTES - 64);
+        fs::write(&path, format!("version = 1\n[extra]\nbig = \"{filler}\"\n")).unwrap();
+        let mut store = ConfigStore::open(path.clone()).unwrap();
+        let err = store.save(Preferences::default()).unwrap_err();
+        assert!(matches!(err.source, ConfigFailure::TooLarge));
+    }
 }

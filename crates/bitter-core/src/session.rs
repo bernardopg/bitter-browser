@@ -244,4 +244,29 @@ mod tests {
         save(&path, session).unwrap();
         assert!(load(&path).is_err());
     }
+
+    #[test]
+    fn load_rejects_unreadable_and_oversized_files() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("session.json");
+        std::fs::write(&path, vec![b' '; MAX_BYTES + 1]).unwrap();
+        assert!(load(&path).is_err());
+
+        std::fs::write(
+            &path,
+            r#"{"version":1,"session":{"workspace":"main","workspaces":[{"tabs":[],"selected":0},{"tabs":[],"selected":0}]}}"#,
+        )
+        .unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let result = load(&path);
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn save_rejects_missing_parent_directory() {
+        let err = save(Path::new("/"), Session::default()).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::Other);
+    }
 }
