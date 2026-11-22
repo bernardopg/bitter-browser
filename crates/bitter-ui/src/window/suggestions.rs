@@ -9,13 +9,13 @@ use std::time::Duration;
 const DEBOUNCE: Duration = Duration::from_millis(90);
 const MAX_RESULTS: usize = 8;
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Destination {
     Navigate(String),
     Switch(String),
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Suggestion {
     title: String,
     detail: String,
@@ -437,4 +437,75 @@ fn label(value: &str, class: &str) -> gtk4::Label {
         .hexpand(true)
         .css_classes([class])
         .build()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn suggestion(title: &str, uri: &str, icon: &'static str) -> Suggestion {
+        Suggestion {
+            title: title.to_owned(),
+            detail: uri.to_owned(),
+            icon,
+            destination: Destination::Navigate(uri.to_owned()),
+        }
+    }
+
+    #[test]
+    fn append_saved_skips_unrecordable_and_duplicate_urls() {
+        let mut results = vec![suggestion(
+            "Existing",
+            "https://example.test/",
+            "user-bookmarks-symbolic",
+        )];
+        append_saved(
+            &mut results,
+            vec![
+                ("https://example.test/".into(), "Duplicate".into()),
+                ("bitter://history".into(), "Internal".into()),
+                ("https://user:pass@secret.test/".into(), "Secret".into()),
+                ("not a url".into(), "Bad".into()),
+                ("https://new.test/".into(), "New".into()),
+            ],
+            "document-open-recent-symbolic",
+        );
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[1].title, "New");
+        assert_eq!(results[1].detail, "https://new.test/");
+        assert_eq!(results[1].icon, "document-open-recent-symbolic");
+    }
+
+    #[test]
+    fn append_saved_uses_url_when_title_is_blank_and_respects_limit() {
+        let mut results = Vec::new();
+        let matches: Matches = (0..10)
+            .map(|i| (format!("https://site{i}.test/"), String::new()))
+            .collect();
+        append_saved(&mut results, matches, "user-bookmarks-symbolic");
+        assert_eq!(results.len(), MAX_RESULTS);
+        assert_eq!(results[0].title, "https://site0.test/");
+        assert_eq!(results[0].detail, "https://site0.test/");
+        assert_eq!(
+            results[MAX_RESULTS - 1].detail,
+            format!("https://site{}.test/", MAX_RESULTS - 1)
+        );
+    }
+
+    #[test]
+    fn append_saved_dedups_against_navigate_rows_only() {
+        let mut results = vec![Suggestion {
+            title: "Switch to Example".into(),
+            detail: "Main · https://example.test/".into(),
+            icon: "tab-new-symbolic",
+            destination: Destination::Switch("tab-1".into()),
+        }];
+        append_saved(
+            &mut results,
+            vec![("https://example.test/".into(), "Example".into())],
+            "user-bookmarks-symbolic",
+        );
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[1].title, "Example");
+    }
 }

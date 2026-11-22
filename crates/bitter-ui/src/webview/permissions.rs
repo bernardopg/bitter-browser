@@ -275,4 +275,32 @@ mod tests {
         assert_eq!(icon(&ask(&[Permission::Camera])), "camera-web-symbolic");
         assert_eq!(icon(&Request::Automatic(true)), "dialog-question-symbolic");
     }
+
+    #[test]
+    fn icons_and_messages_cover_each_permission_kind() {
+        let ask = |permissions: &[Permission]| Request::Ask(permissions.to_vec());
+        assert_eq!(
+            message("site", &ask(&[Permission::Camera])),
+            "site wants to use your camera"
+        );
+        assert_eq!(
+            message("site", &ask(&[Permission::Microphone])),
+            "site wants to use your microphone"
+        );
+        assert_eq!(
+            icon(&ask(&[Permission::Notifications])),
+            "preferences-system-notifications-symbolic"
+        );
+        assert_eq!(
+            icon(&ask(&[Permission::Location])),
+            "find-location-symbolic"
+        );
+        assert_eq!(icon(&ask(&[Permission::Clipboard])), "edit-paste-symbolic");
+        assert_eq!(icon(&ask(&[])), "dialog-question-symbolic");
+        assert_eq!(
+            icon(&Request::AskOnce("share your screen")),
+            "video-display-symbolic"
+        );
+        assert_eq!(icon(&Request::Automatic(false)), "dialog-question-symbolic");
+    }
 }
