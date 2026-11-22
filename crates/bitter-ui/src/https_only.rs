@@ -151,5 +151,7 @@ mod tests {
             "https://example.com/",
             "https://example.com/"
         ));
+        assert!(!is_upgrade_of("not a url", "https://example.com/"));
+        assert!(!is_upgrade_of("http://example.com/", "not a url"));
     }
 }

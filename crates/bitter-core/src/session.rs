@@ -244,4 +244,37 @@ mod tests {
         save(&path, session).unwrap();
         assert!(load(&path).is_err());
     }
+
+    #[test]
+    fn load_and_save_reject_invalid_paths_and_oversized_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("session.json");
+        std::fs::write(&path, vec![b' '; MAX_BYTES + 1]).unwrap();
+        assert!(load(&path).is_err());
+
+        assert!(save(Path::new("/"), Session::default()).is_err());
+        let mut session = Session::default();
+        session.workspaces[0].tabs = vec![
+            SavedTab {
+                uri: "x".repeat(30_000),
+                title: "big".into(),
+            };
+            80
+        ];
+        assert!(save(&dir.path().join("big.json"), session).is_err());
+
+        let target = dir.path().join("dir.json");
+        std::fs::create_dir(&target).unwrap();
+        assert!(save(&target, Session::default()).is_err());
+
+        let unreadable = dir.path().join("unreadable.json");
+        std::fs::write(&unreadable, b"{}").unwrap();
+        let mut perms = std::fs::metadata(&unreadable).unwrap().permissions();
+        std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o000);
+        std::fs::set_permissions(&unreadable, perms.clone()).unwrap();
+        let result = load(&unreadable);
+        std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o644);
+        std::fs::set_permissions(&unreadable, perms).unwrap();
+        assert!(result.is_err());
+    }
 }
