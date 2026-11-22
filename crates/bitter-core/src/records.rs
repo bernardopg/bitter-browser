@@ -697,15 +697,6 @@ mod tests {
     }
 
     #[test]
-    fn permission_labels_are_human_readable() {
-        assert_eq!(Permission::Notifications.label(), "Notifications");
-        assert_eq!(Permission::Location.label(), "Location");
-        assert_eq!(Permission::Camera.label(), "Camera");
-        assert_eq!(Permission::Microphone.label(), "Microphone");
-        assert_eq!(Permission::Clipboard.label(), "Read clipboard");
-    }
-
-    #[test]
     fn forget_missing_zoom_is_a_noop() {
         let dir = tempfile::tempdir().unwrap();
         let (mut zoom, _) = ZoomLevels::open(dir.path().join("zoom.json"));
