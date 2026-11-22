@@ -46,7 +46,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [ ] **PRD-02 — Threat model.** Map untrusted pages, extensions if supported, internal pages, native processes, profiles and filesystem; document trust boundaries, attackers, security assumptions, abuse cases and residual risk. Have it independently reviewed. Depends: PRD-01.
   *Status:* Not started.
 - [ ] **PRD-03 — Inventory and ownership.** Audit each workspace crate, dependency, runtime, data store and UI entry point; identify owner/maintainer and choose implement, defer or remove for every placeholder. Ensure claims in README and settings match actual capabilities. Depends: PRD-01.
-  *Status:* Partial. The README and settings now describe only working features (#15); `bitter-net` and `bitter-devtools` are still scaffolds and `bitter-cli` prints a placeholder, without a decision for each.
+  *Status:* Partial. The README and settings now describe only working features (#15); `bitter-net` and `bitter-devtools` are still scaffolds and `bitter-cli` has only a partial command-line contract, without a decision for each.
 - [ ] **PRD-04 — Quality gates.** Define measurable security, functional, compatibility, accessibility, performance, recovery and support gates; include test environments, evidence, sign-off owner and explicit release blocker policy. No gate may be satisfied solely by a coverage percentage. Depends: PRD-01, PRD-02.
   *Status:* Not started.
 
@@ -112,7 +112,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [x] **DEV-01 — Developer tools.** Decide whether to expose WebKit inspector or implement additional tools; gate access appropriately and test opening, closing and production defaults. Remove placeholder claims. Depends: PRD-03.
   *Status:* WebKit inspector behind F12, Ctrl+Shift+I and Inspect Element, on by default and switchable in preferences, with an open and close smoke test (#15). `bitter-devtools` is not used.
 - [ ] **CLI-01 — Command-line contract.** Either implement documented URI, profile, help, version and error semantics or remove the placeholder from shipped packages. Test invalid arguments and running-instance handling. Depends: DATA-01, PRD-03.
-  *Status:* Partial. `bitter-ui` handles URIs, `--version` and `--help` and hands links to the running instance (#8, #10). `bitter-cli` now has a real argument parser, `--help`/`--version`, URI passthrough to `bitter-ui`, error reporting, and unit/integration tests; it is still not installed by Meson and has no profile-selection contract.
+  *Status:* Partial. `bitter-ui` handles URIs, `--version` and `--help` and hands links to the running instance (#8, #10). `bitter-cli` has a real argument parser, `--help`/`--version`, URI passthrough to `bitter-ui`, error reporting, unit/integration tests, and Meson installs it alongside `bitter-ui`. No profile-selection contract or `bitter-cli`-specific running-instance handling is implemented; invalid arguments and URI launch are tested, but the full command-line contract is not documented.
 - [ ] **EXT-01 — Extensions and credentials decision.** Explicitly decide support for extensions, password management, sync and account features; exclude them from v1 unless threat model, privacy design, consent and maintenance capacity are approved. Depends: PRD-01, PRD-02.
   *Status:* Not decided.
 
