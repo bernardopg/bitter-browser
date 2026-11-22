@@ -444,6 +444,17 @@ fn modified(path: &Path) -> Option<SystemTime> {
 mod tests {
     use super::*;
 
+    /// `ContentBlocker::new` creates a WebKit filter store and adds a timer
+    /// to the global GLib main context. Neither may be done from two test
+    /// threads at once: the second acquire panics or WebKit aborts.
+    static WEBKIT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn webkit_lock() -> std::sync::MutexGuard<'static, ()> {
+        WEBKIT_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     #[test]
     fn status_describes_lists_and_their_age() {
         assert_eq!(Status::Off.describe(), "Off");
@@ -490,6 +501,7 @@ mod tests {
 
     #[test]
     fn accept_download_renames_validated_lists() {
+        let _webkit = webkit_lock();
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join("filter-lists")).unwrap();
         let blocker = ContentBlocker::new(
@@ -521,6 +533,7 @@ mod tests {
 
     #[test]
     fn accept_download_rejects_oversized_lists() {
+        let _webkit = webkit_lock();
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join("filter-lists")).unwrap();
         let blocker = ContentBlocker::new(
