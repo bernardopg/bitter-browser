@@ -69,7 +69,9 @@ pub fn help_text(program: &str) -> String {
 Open web addresses in Bitter Browser.\n\n\
 Options:\n\
   -h, --help     Show this help and exit\n\
-  -v, --version  Show the version and exit\n"
+  -v, --version  Show the version and exit\n\n\
+Profile selection is not implemented; bitter-cli uses the same profile as\n\
+bitter-ui.\n"
     )
 }
 
@@ -186,6 +188,7 @@ mod tests {
         assert!(help.contains("Usage: bitter-cli [OPTION] [URL...]"));
         assert!(help.contains("--help"));
         assert!(help.contains("--version"));
+        assert!(help.contains("Profile selection is not implemented"));
         assert_eq!(version_text(), format!("Bitter Browser {VERSION}"));
     }
 
