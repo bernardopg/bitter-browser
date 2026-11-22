@@ -212,4 +212,32 @@ mod tests {
         assert!(bookmarks.search("nothing").unwrap().is_empty());
         assert_eq!(bookmarks.search("DOCS").unwrap().len(), 1);
     }
+
+    #[test]
+    fn open_for_search_reads_existing_bookmarks() {
+        let dir = tempfile::tempdir().unwrap();
+        let bookmarks = Bookmarks::open(dir.path()).unwrap();
+        bookmarks
+            .add_bookmark("https://a.test/", Some("A page"))
+            .unwrap();
+        let read_only = Bookmarks::open_for_search(dir.path()).unwrap();
+        assert_eq!(read_only.search("a.test").unwrap()[0].0, "https://a.test/");
+        let missing = tempfile::tempdir().unwrap();
+        assert!(Bookmarks::open_for_search(missing.path()).is_err());
+    }
+
+    #[test]
+    fn broken_database_reports_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let bookmarks = Bookmarks::open(dir.path()).unwrap();
+        bookmarks
+            .conn
+            .execute_batch("DROP TABLE bookmarks;")
+            .unwrap();
+        assert!(bookmarks.is_bookmarked("https://a.test/").is_err());
+        assert!(bookmarks.get_all().is_err());
+        assert!(bookmarks.search("a").is_err());
+        assert!(bookmarks.add_bookmark("https://a.test/", None).is_err());
+        assert!(bookmarks.remove_bookmark("https://a.test/").is_err());
+    }
 }
