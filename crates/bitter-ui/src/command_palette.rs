@@ -413,4 +413,14 @@ mod tests {
         assert!(!command_matches(&cmd, "nothing here"));
         assert!(command_matches(&cmd, ""));
     }
+
+    #[test]
+    fn command_matches_is_case_insensitive_for_command_text() {
+        let cmd = command("Open History", &["Recent", "Visited"]);
+        assert!(command_matches(&cmd, "history"));
+        assert!(command_matches(&cmd, "recent"));
+        assert!(command_matches(&cmd, "visited"));
+        // Query is matched as provided; callers pass a lowercased query.
+        assert!(!command_matches(&cmd, "History"));
+    }
 }

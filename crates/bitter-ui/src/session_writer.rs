@@ -108,4 +108,13 @@ mod tests {
         writer.queue(Session::default());
         assert_eq!(session::load(&path).unwrap(), Session::default());
     }
+
+    #[test]
+    fn newest_result_is_empty_before_any_save_completes() {
+        let profile = tempfile::tempdir().unwrap();
+        let path = profile.path().join("session.json");
+        let writer = SessionWriter::new(path).unwrap();
+        assert!(writer.newest_result().is_none());
+        drop(writer);
+    }
 }
