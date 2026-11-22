@@ -2,7 +2,7 @@
 
 This is the tracked roadmap for bringing the current experimental Linux browser to an explicitly defined production release. Unchecked items are work to do, not promises of existing functionality; their status lines describe what already exists. Use GitHub issues for discussion and assignment; link issues and PRs to the stable task IDs below. A task is complete only when its acceptance evidence is linked from the issue or PR. Split large tasks into smaller issues as needed; do not treat this file as an automatically synchronized issue tracker.
 
-## Current state (v0.3.0, 2026-11-19)
+## Current state (v0.4.0, 2026-11-22)
 
 Status lines under each task say what exists today and what is still missing.
 `[x]` marks tasks whose acceptance work is implemented and tested, with the
@@ -15,7 +15,7 @@ most of it works, until its remaining gaps are closed.
 | Privacy and security | Per-site permissions, ad and tracker blocking (built-in list, EasyList, EasyPrivacy), HTTPS-only mode, tracking prevention, third-party cookie policy, clearing browsing data. No private browsing, threat model or security review yet. |
 | Data | Locked XDG profile, versioned SQLite migrations, validated atomic configuration, atomic session, site settings, zoom and download records. |
 | Packaging | Offline Flatpak, release and `-git` Arch packages, signed tags, SBOM, checksums and provenance attestations. v0.2.1 was installed from its release assets with pacman and Flatpak and used on a Hyprland Wayland session. |
-| Verification | 114 automated unit and integration tests, a display test for preferences and an Xvfb smoke test in CI that drives the real browser against loopback fixtures. Line coverage of the automated tests is 40.24% (`cargo llvm-cov`, 2026-11-19); the smoke test is not instrumented. |
+| Verification | 157 automated unit and integration tests, a display test for preferences and an Xvfb smoke test in CI that drives the real browser against loopback fixtures. Line coverage of the automated tests is 46.77% (`cargo llvm-cov`, 2026-11-22); the smoke test is not instrumented. |
 | Not started | Product contract, threat model, quality gates (PRD-01 to PRD-04), accessibility and localization, compatibility matrix, private profiles, backup and import, extensions decision. |
 
 Scope is Linux x86-64, Wayland and X11, and the documented Flatpak and Arch
@@ -95,7 +95,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [ ] **UI-03 — Downloads and uploads.** Implement explicit destination selection, overwrite and cancellation handling, progress, failure reporting and safe file-opening behavior; test Flatpak portal paths and untrusted filenames. Depends: SEC-02, DATA-01.
   *Status:* Partial. Destination choice, unique names, overwrite protection, progress, cancel, failure reporting, a persistent list and uploads (#10, #14). Missing: tests under the Flatpak file chooser portal.
 - [ ] **UI-04 — Bookmarks and history.** Complete CRUD, search, delete/clear, escaping and error states; prove persistence and timestamp/FTS behavior on real temporary SQLite databases. Depends: DATA-02, SEC-03.
-  *Status:* Partial. History and bookmarks with search and filters, clearing history, and deleting single history entries from the history page (#8, #14, #15). Missing: editing bookmarks.
+  *Status:* Partial. History and bookmarks with search and filters, clearing history, and deleting single history entries from the history page; only the history page itself can trigger deletion (#8, #14, #15, #30). Missing: editing bookmarks.
 - [x] **UI-05 — Settings and browser identity.** Replace the placeholder settings page with accessible controls tied to effective persisted behavior; show security state and errors accurately, including unavailable controls. Depends: DATA-03, SEC-06.
   *Status:* Preferences in four pages tied to effective behavior, with save errors, a site panel showing connection state, and a display test (#8, #15).
 - [ ] **UI-06 — Accessibility and localization.** Meet agreed keyboard-only, screen-reader, focus, high-contrast and scaling requirements; externalize strings and test at least the supported locales. Record manual and automated evidence. Depends: PRD-01.
@@ -112,7 +112,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [x] **DEV-01 — Developer tools.** Decide whether to expose WebKit inspector or implement additional tools; gate access appropriately and test opening, closing and production defaults. Remove placeholder claims. Depends: PRD-03.
   *Status:* WebKit inspector behind F12, Ctrl+Shift+I and Inspect Element, on by default and switchable in preferences, with an open and close smoke test (#15). `bitter-devtools` is not used.
 - [ ] **CLI-01 — Command-line contract.** Either implement documented URI, profile, help, version and error semantics or remove the placeholder from shipped packages. Test invalid arguments and running-instance handling. Depends: DATA-01, PRD-03.
-  *Status:* Partial. `bitter-ui` handles URIs, `--version` and `--help` and hands links to the running instance (#8, #10). `bitter-cli` has a real argument parser, `--help`/`--version`, URI passthrough to `bitter-ui`, error reporting, unit/integration tests, and Meson installs it alongside `bitter-ui`. No profile-selection contract or `bitter-cli`-specific running-instance handling is implemented; invalid arguments and URI launch are tested, but the full command-line contract is not documented.
+  *Status:* Partial. `bitter-ui` handles URIs, `--version` and `--help` and hands links to the running instance (#8, #10). `bitter-cli` has an argument parser, `--help`/`--version`, URI passthrough to `bitter-ui`, error reporting and tests, and Meson installs it alongside `bitter-ui` (#20, #26, #27); its behavior is documented in [Daily browsing](docs/daily-browsing.md#command-line-and-default-browser). Missing: profile selection, a decision on bare host names (today treated as files by GTK) and a running-instance test through `bitter-cli`.
 - [ ] **EXT-01 — Extensions and credentials decision.** Explicitly decide support for extensions, password management, sync and account features; exclude them from v1 unless threat model, privacy design, consent and maintenance capacity are approved. Depends: PRD-01, PRD-02.
   *Status:* Not decided.
 
@@ -125,7 +125,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [ ] **TEST-03 — Security integration.** Automate hostile local origins, redirects, certificate failures, permission requests and crafted saved content; record actual browser/engine versions, results and limits. Depends: SEC-01–06.
   *Status:* Not started beyond the permission and pop-up checks in the smoke test.
 - [ ] **TEST-04 — Coverage policy.** Measure per-crate and workspace line/branch coverage with documented exclusions; establish evidence-based ratcheting targets after a baseline and enforce no unjustified regressions. Coverage cannot substitute for TEST-02/03. Depends: TEST-01.
-  *Status:* Partial. Coverage is measured in CI (40.24% line coverage baseline on 2026-11-19, instrumented automated tests only); `docs/coverage.md` drafts the measurement, exclusion, and ratchet policy. Missing: per-crate/branch targets, documented exclusion list with owners, and enforced no-regression ratchet.
+  *Status:* Partial. Coverage is measured in CI (46.77% line coverage on 2026-11-22, up from a 40.24% baseline on 2026-11-19; instrumented automated tests only); `docs/coverage.md` drafts the measurement, exclusion, and ratchet policy. Missing: per-crate/branch targets, documented exclusion list with owners, and enforced no-regression ratchet.
 - [x] **TEST-05 — Continuous integration.** Run formatting, lint, unit/integration, coverage, workflow validation, CodeQL and dependency checks on protected PRs; test artifacts and caching safely for untrusted forks. Document required check ownership and failure response. Depends: TEST-01–04.
   *Status:* Formatting, Clippy, `cargo audit`, coverage, the display and smoke tests, CodeQL, dependency review and vendored source checks run on every PR and gate auto-merge (#5, #9, #11).
 - [ ] **TEST-06 — Performance and soak.** Define hardware and repeatable startup, navigation, memory, tab-count and long-running benchmarks; investigate regressions and publish reproducible measurements. Depends: PRD-04.

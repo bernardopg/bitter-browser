@@ -49,10 +49,10 @@ workspaces, and the interface follows the GNOME design language.
 | **Site permissions** | Sites ask before using notifications, location, camera, microphone or the clipboard; answers are remembered per site and can be changed from the address bar or preferences. |
 | **Content blocking** | Blocks ads and trackers with EasyList and EasyPrivacy, compiled by WebKit and refreshed every few days, with a per-site switch. |
 | **HTTPS-only mode** | Loads sites over HTTPS and asks before opening a site that has no secure version. |
-| **Privacy controls** | Cross-site tracking prevention, third-party cookie blocking and clearing history, cookies, cache and downloads by time range. |
+| **Privacy controls** | Cross-site tracking prevention, third-party cookie blocking and clearing history, cookies, cache and downloads by time range, or single pages from the History page. |
 | **Context menu** | Open links and images in a new or background tab, and search the selected text. Hovered links show their address. |
 | **Developer tools** | Web Inspector with F12, Ctrl+Shift+I or Inspect Element. |
-| **Desktop integration** | Opens links from other applications in the running window. |
+| **Desktop integration** | Opens links from other applications in the running window; `bitter-cli` launches it from scripts and terminals. |
 | **Native preferences** | General, privacy, permissions and advanced pages, saved immediately and atomically. |
 | **Local data** | SQLite history and bookmarks with versioned migrations and a locked XDG profile. |
 
@@ -77,7 +77,7 @@ a checksum file. All assets carry GitHub build provenance attestations.
 
 ```sh
 flatpak install --user flathub org.gnome.Platform//51
-flatpak install --user ./bitter-browser-0.3.0-x86_64.flatpak
+flatpak install --user ./bitter-browser-0.4.0-x86_64.flatpak
 flatpak run com.bitterbrowser.Browser
 ```
 
@@ -97,8 +97,8 @@ repository root, which builds `bitter-browser-git`.
 ### Verify a download
 
 ```sh
-sha256sum -c --ignore-missing bitter-browser-0.3.0-sha256.txt
-gh attestation verify bitter-browser-0.3.0-x86_64.flatpak --repo bernardopg/bitter-browser
+sha256sum -c --ignore-missing bitter-browser-0.4.0-sha256.txt
+gh attestation verify bitter-browser-0.4.0-x86_64.flatpak --repo bernardopg/bitter-browser
 ```
 
 ## Keyboard shortcuts
@@ -139,6 +139,8 @@ meson compile -C builddir
 meson install -C builddir
 ```
 
+This installs `bitter-ui` and the `bitter-cli` launcher.
+
 The browser needs a graphical session. The end-to-end WebKit smoke test runs
 under Xvfb; see [daily browsing](docs/daily-browsing.md#verification).
 
@@ -149,7 +151,8 @@ under Xvfb; see [daily browsing](docs/daily-browsing.md#verification).
 | [Daily browsing](docs/daily-browsing.md) | Shortcuts, workspaces, suggestions, smoke test and startup baseline |
 | [Profiles and local data](docs/profile.md) | File locations, migrations, session restore and recovery |
 | [Architecture](docs/architecture.md) | Crate layout and current scope |
-| [CI and releases](docs/ci-release.md) | Checks, coverage and the release process |
+| [CI and releases](docs/ci-release.md) | Checks, coverage, branch cleanup and the release process |
+| [Agent instructions](AGENTS.md) | Checks before pushing and the merged-branch policy |
 | [Roadmap](TASKS.md) | Production readiness plan |
 
 ## Contributing

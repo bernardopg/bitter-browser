@@ -89,7 +89,8 @@ third-party cookies, which WebKit also does by default.
 files and the download list, for the last hour, day, week, four weeks or all
 time. The download list is always cleared completely. WebKitGTK cannot pick
 cookies by age, so for a time range the browser removes the cookies of the
-sites you visited in that range; "All time" removes every cookie.
+sites you visited in that range; "All time" removes every cookie. To remove
+one page from history, open History (Ctrl+H) and press × on its row.
 
 Spell checking follows your system languages and needs the matching
 dictionaries (for example `hunspell-en_us`). Developer tools can be turned
@@ -120,8 +121,21 @@ stay listed after a restart until you clear them.
 bitter-ui https://example.org        # opens in the running window, if any
 bitter-ui --version
 bitter-ui --help
+bitter-cli https://example.org       # launcher with the same behavior
+bitter-cli --version
 xdg-settings set default-web-browser com.bitterbrowser.Browser.desktop
 ```
+
+`bitter-cli` is a small launcher installed next to `bitter-ui`. It accepts
+`-h`/`--help` and `-v`/`--version`, rejects unknown options with exit code 2,
+and passes every other argument to `bitter-ui` (everything after `--` is
+passed unchanged). It runs the `bitter-ui` next to it, or the program named
+by `BITTER_BROWSER_BIN`, and returns its exit code. Both use the same
+profile; there is no profile selection yet.
+
+Give full addresses with their scheme. A bare name such as `example.org` is
+treated as a file in the current directory, as with other GTK
+applications.
 
 Under Flatpak, use `flatpak run com.bitterbrowser.Browser` with the same
 arguments. Desktop environments can also set the default browser in their
