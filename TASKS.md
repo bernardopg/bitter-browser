@@ -111,7 +111,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [x] **DEV-01 — Developer tools.** Decide whether to expose WebKit inspector or implement additional tools; gate access appropriately and test opening, closing and production defaults. Remove placeholder claims. Depends: PRD-03.
   *Status:* WebKit inspector behind F12, Ctrl+Shift+I and Inspect Element, on by default and switchable in preferences, with an open and close smoke test (#15). `bitter-devtools` is not used.
 - [ ] **CLI-01 — Command-line contract.** Either implement documented URI, profile, help, version and error semantics or remove the placeholder from shipped packages. Test invalid arguments and running-instance handling. Depends: DATA-01, PRD-03.
-  *Status:* Partial. `bitter-ui` handles URIs, `--version` and `--help` and hands links to the running instance (#8, #10). `bitter-cli` still prints a placeholder; it is not installed by Meson.
+  *Status:* Partial. `bitter-ui` handles URIs, `--version` and `--help` and hands links to the running instance (#8, #10). `bitter-cli` now has a real argument parser, `--help`/`--version`, URI passthrough to `bitter-ui`, error reporting, and unit/integration tests; it is still not installed by Meson and has no profile-selection contract.
 - [ ] **EXT-01 — Extensions and credentials decision.** Explicitly decide support for extensions, password management, sync and account features; exclude them from v1 unless threat model, privacy design, consent and maintenance capacity are approved. Depends: PRD-01, PRD-02.
   *Status:* Not decided.
 
