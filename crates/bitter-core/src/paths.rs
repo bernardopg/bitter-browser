@@ -257,6 +257,52 @@ mod tests {
     }
 
     #[test]
+    fn reports_create_dir_failures() {
+        let root = tempfile::tempdir().unwrap();
+        let base = root.path().join("readonly");
+        fs::create_dir(&base).unwrap();
+        let mut perms = fs::metadata(&base).unwrap().permissions();
+        std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o500);
+        fs::set_permissions(&base, perms.clone()).unwrap();
+        let result = Profile::open_at(&base, root.path(), root.path());
+        std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o700);
+        fs::set_permissions(&base, perms).unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn rejects_lock_files_with_extra_hard_links() {
+        let root = tempfile::tempdir().unwrap();
+        let config = root.path().join("config").join(PROFILE_DIR);
+        fs::create_dir_all(&config).unwrap();
+        let lock = config.join("profile.lock");
+        fs::write(&lock, b"").unwrap();
+        fs::hard_link(&lock, config.join("profile.lock.extra")).unwrap();
+        let err = Profile::open_at(
+            &root.path().join("config"),
+            &root.path().join("data"),
+            &root.path().join("cache"),
+        );
+        assert!(matches!(err, Err(ProfileError::Access { .. })));
+    }
+
+    #[test]
+    fn reports_create_errors_for_unwritable_profile_parents() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir().unwrap();
+        let config = root.path().join("config");
+        let data = root.path().join("data");
+        let cache = root.path().join("cache");
+        fs::create_dir_all(&config).unwrap();
+        fs::create_dir_all(&data).unwrap();
+        fs::create_dir_all(&cache).unwrap();
+        fs::set_permissions(&data, fs::Permissions::from_mode(0o555)).unwrap();
+        let err = Profile::open_at(&config, &data, &cache);
+        fs::set_permissions(&data, fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(matches!(err, Err(ProfileError::Access { .. })));
+    }
+
+    #[test]
     fn open_uses_xdg_directories() {
         static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
         let _guard = LOCK.lock().unwrap();

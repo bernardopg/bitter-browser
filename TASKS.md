@@ -15,7 +15,7 @@ most of it works, until its remaining gaps are closed.
 | Privacy and security | Per-site permissions, ad and tracker blocking (built-in list, EasyList, EasyPrivacy), HTTPS-only mode, tracking prevention, third-party cookie policy, clearing browsing data. No private browsing, threat model or security review yet. |
 | Data | Locked XDG profile, versioned SQLite migrations, validated atomic configuration, atomic session, site settings, zoom and download records. |
 | Packaging | Offline Flatpak, release and `-git` Arch packages, signed tags, SBOM, checksums and provenance attestations. v0.2.1 was installed from its release assets with pacman and Flatpak and used on a Hyprland Wayland session. |
-| Verification | 104 unit and integration tests, a display test for preferences and an Xvfb smoke test in CI that drives the real browser against loopback fixtures. Line coverage of the automated tests is 40.24% (`cargo llvm-cov`, 2026-11-19); the smoke test is not instrumented. |
+| Verification | 114 automated unit and integration tests, a display test for preferences and an Xvfb smoke test in CI that drives the real browser against loopback fixtures. Line coverage of the automated tests is 40.24% (`cargo llvm-cov`, 2026-11-19); the smoke test is not instrumented. |
 | Not started | Product contract, threat model, quality gates (PRD-01 to PRD-04), accessibility and localization, compatibility matrix, private profiles, backup and import, extensions decision. |
 
 Scope is Linux x86-64, Wayland and X11, and the documented Flatpak and Arch
@@ -31,8 +31,9 @@ Details: [Profiles and local data](docs/profile.md),
 2. TEST-03 with SEC-04 and SEC-05: a disposable local CA, invalid
    certificates, mixed content, and permission denial and origin changes in
    the smoke test.
-3. NET-02 gaps: a size limit for filter list downloads and an automated test
-   of network blocking and of the per-site exception.
+3. NET-02 gaps: automated tests of network blocking and of the per-site
+   exception. A download size limit for filter lists was added; keep the
+   remaining coverage behavior-driven.
 4. UI-06: keyboard and screen reader review of the new bars, panels and
    pages, and externalized strings.
 5. UI-07: a compatibility matrix with sign-in pop-ups, video calls and media
@@ -66,7 +67,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [ ] **SEC-07 — Private profiles and data clearing.** Define private-session isolation and lifecycle, storage/cookie/cache/history clearing and user-visible scope; test persistence, restart and isolation on both supported installation methods. Depends: DATA-01.
   *Status:* Partial. Clearing history, cookies and site data, cache and downloads by time range, with a smoke test for history and cookies (#15). WebKitGTK cannot select cookies by age, so ranged clears remove the cookies of sites visited in the range. Private sessions do not exist.
 - [ ] **SEC-08 — Secrets, telemetry and logging.** Define data collection policy; avoid collecting credentials or browsing history in logs/crash reports; protect any stored secrets using an appropriate OS secret service, with denial/unavailable behavior tested. No production telemetry without an explicit user-facing policy. Depends: PRD-02.
-  *Status:* Not started. No telemetry; logs have not been audited for browsing data.
+  *Status:* Partial. No product telemetry is implemented; `docs/security-logging.md` is a draft policy grounded in current code behavior. Missing: a formal log redaction/audit pass, user-facing policy/consent if telemetry is ever added, and secret-service design/tests for any future stored secrets.
 - [ ] **SEC-09 — Security verification and response.** Establish supported-version, vulnerability disclosure, triage, fix and coordinated-release procedures; perform dependency audit, focused independent security review and threat-model regression before release. Track findings through closure. Depends: SEC-01–08.
   *Status:* Partial. Private vulnerability reporting, `cargo audit`, CodeQL and dependency review run in CI (#5). No release triage procedure or independent review.
 
@@ -107,7 +108,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [ ] **NET-01 — Network ownership.** Decide whether WebKit or `bitter-net` owns proxy, DNS, TLS and cookie behavior; implement only policies actually enforceable by the engine, document exceptions and test proxy/offline behavior. Depends: PRD-03, SEC-04.
   *Status:* Not started. WebKit owns networking; `bitter-net` is a scaffold.
 - [ ] **NET-02 — Content blocking lifecycle.** If included in v1, integrate `bitter-adblock` with requests, define filter provenance, refresh, integrity, failure and resource limits; test rules and allowlists. Otherwise defer transparently and remove false UI claims. Depends: SEC-06.
-  *Status:* Partial. `bitter-adblock` converts lists, the browser downloads them over HTTPS in an ephemeral session, validates the format, keeps the previous lists on failure, caps rules at 150,000 and refreshes every four days, with a per-site exception (#15). Missing: a download size limit and automated tests of network blocking and the exception.
+  *Status:* Partial. `bitter-adblock` converts lists, the browser downloads them over HTTPS in an ephemeral session, validates the format, rejects lists over the 8 MiB size limit, keeps the previous lists on failure, caps rules at 150,000 and refreshes every four days, with a per-site exception (#15). Missing: automated tests of network blocking and the per-site exception.
 - [x] **DEV-01 — Developer tools.** Decide whether to expose WebKit inspector or implement additional tools; gate access appropriately and test opening, closing and production defaults. Remove placeholder claims. Depends: PRD-03.
   *Status:* WebKit inspector behind F12, Ctrl+Shift+I and Inspect Element, on by default and switchable in preferences, with an open and close smoke test (#15). `bitter-devtools` is not used.
 - [ ] **CLI-01 — Command-line contract.** Either implement documented URI, profile, help, version and error semantics or remove the placeholder from shipped packages. Test invalid arguments and running-instance handling. Depends: DATA-01, PRD-03.
@@ -124,7 +125,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [ ] **TEST-03 — Security integration.** Automate hostile local origins, redirects, certificate failures, permission requests and crafted saved content; record actual browser/engine versions, results and limits. Depends: SEC-01–06.
   *Status:* Not started beyond the permission and pop-up checks in the smoke test.
 - [ ] **TEST-04 — Coverage policy.** Measure per-crate and workspace line/branch coverage with documented exclusions; establish evidence-based ratcheting targets after a baseline and enforce no unjustified regressions. Coverage cannot substitute for TEST-02/03. Depends: TEST-01.
-  *Status:* Partial. Coverage is measured in CI (32.7% of lines on 2026-11-19); no per-crate targets or ratchet.
+  *Status:* Partial. Coverage is measured in CI (40.24% line coverage baseline on 2026-11-19, instrumented automated tests only); `docs/coverage.md` drafts the measurement, exclusion, and ratchet policy. Missing: per-crate/branch targets, documented exclusion list with owners, and enforced no-regression ratchet.
 - [x] **TEST-05 — Continuous integration.** Run formatting, lint, unit/integration, coverage, workflow validation, CodeQL and dependency checks on protected PRs; test artifacts and caching safely for untrusted forks. Document required check ownership and failure response. Depends: TEST-01–04.
   *Status:* Formatting, Clippy, `cargo audit`, coverage, the display and smoke tests, CodeQL, dependency review and vendored source checks run on every PR and gate auto-merge (#5, #9, #11).
 - [ ] **TEST-06 — Performance and soak.** Define hardware and repeatable startup, navigation, memory, tab-count and long-running benchmarks; investigate regressions and publish reproducible measurements. Depends: PRD-04.
@@ -139,7 +140,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [ ] **OPS-03 — Updates and vulnerability monitoring.** Define supported WebKit/OS/Flatpak runtime update cadence and response SLA; track sources not covered by Dependabot, validate compatibility and exercise emergency security releases. Depends: PRD-01, SEC-09.
   *Status:* Partial. Dependabot covers Cargo and Actions; the Flatpak runtime and WebKitGTK are updated by hand. No cadence or response target.
 - [ ] **OPS-04 — Diagnostics and incident response.** Document privacy-preserving diagnostics, reproducible bug reports, crash handling, triage, maintainer ownership and security incident escalation; test recovery and release rollback. Depends: SEC-08, REL-01.
-  *Status:* Not started.
+  *Status:* Partial. `docs/diagnostics-incident.md` is an initial draft grounded in current behavior and `SECURITY.md`. Missing: maintainer ownership/rotation, support/severity response targets, privacy-reviewed diagnostics bundle format, and tested rollback/incident drills.
 - [ ] **OPS-05 — Community and support.** Keep installation, known limitations, compatibility, accessibility, security and contribution docs accurate; define maintenance capacity, issue triage and support expectations. Test published links and package instructions. Depends: PRD-01.
   *Status:* Partial. Install, usage, profile, release and security docs are kept current with each change. No support or triage policy.
 
