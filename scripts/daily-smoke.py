@@ -249,6 +249,19 @@ class Browser:
     def xdotool(self, *args):
         return subprocess.check_output(["xdotool", *args], text=True).strip()
 
+    def focus_window(self, window, required=True):
+        for attempt in range(3):
+            for cmd in (["windowfocus", "--sync", window], ["windowactivate", "--sync", window]):
+                try:
+                    self.xdotool(*cmd)
+                    return
+                except subprocess.CalledProcessError:
+                    pass
+            if attempt < 2:
+                time.sleep(0.2)
+        if required:
+            self.xdotool("windowfocus", "--sync", window)
+
     def start(self):
         start = time.monotonic()
         with self.log.open("ab") as log:
@@ -266,7 +279,7 @@ class Browser:
         self.window = eventually(window_id, "Browser window did not open")
         elapsed = time.monotonic() - start
         self.xdotool("windowmove", self.window, "60", "60")
-        self.xdotool("windowfocus", "--sync", self.window)
+        self.focus_window(self.window)
         return elapsed
 
     def dialog(self):
@@ -286,7 +299,7 @@ class Browser:
                   "browser", self.window, "pid", self.process.pid, "downloads",
                   list(self.downloads.glob("*")), flush=True)
             raise
-        self.xdotool("windowfocus", "--sync", window)
+        self.focus_window(window)
         time.sleep(0.5)
         return window
 
@@ -357,7 +370,7 @@ class Browser:
                 if crash:
                     self.process.kill()
                 else:
-                    self.xdotool("windowfocus", "--sync", self.window)
+                    self.focus_window(self.window, required=False)
                     self.key("ctrl+q")
                 code = self.process.wait(timeout=10)
                 assert crash or code == 0, f"Browser exited {code}\n{self.log.read_text()}"
