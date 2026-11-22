@@ -1273,6 +1273,18 @@ impl Browser {
             let Some((browser, tab)) = upgrade(&weak, &weak_tab) else {
                 return false;
             };
+            let request_uri = action.request().and_then(|request| request.uri());
+            if kind == NavigationAction
+                && action.is_user_gesture()
+                && let Some(uri) = request_uri.as_deref()
+                && let Some(changed) = browser.handle_internal_action(uri)
+            {
+                if changed && let Some(view) = tab.view.get() {
+                    browser.reload_internal_page(&tab, view);
+                }
+                decision.ignore();
+                return true;
+            }
             let Some((workspace, _)) = browser.tab_position(&tab.id) else {
                 return false;
             };
@@ -1392,6 +1404,28 @@ impl Browser {
                 self.toast("History could not be saved. Check disk space and profile permissions.");
             }
             Err(_) => {}
+        }
+    }
+
+    fn handle_internal_action(&self, uri: &str) -> Option<bool> {
+        let target = internal_history_delete_target(uri)?;
+        match self.history.remove(&target) {
+            Ok(true) => Some(true),
+            Ok(false) => Some(false),
+            Err(error) => {
+                tracing::warn!("Could not remove a history entry: {error}");
+                self.toast(
+                    "Could not remove history entry. Check disk space and profile permissions.",
+                );
+                Some(false)
+            }
+        }
+    }
+
+    fn reload_internal_page(&self, tab: &Tab, view: &TabView) {
+        let uri = tab.uri();
+        if uri.starts_with("bitter://") {
+            self.navigate(tab, view, &uri);
         }
     }
 }
@@ -1550,6 +1584,19 @@ fn navigation_target(input: &str, engine: SearchEngine) -> Result<Option<Target>
     Ok(Some(Target::Search(engine.search_url(input))))
 }
 
+fn internal_history_delete_target(uri: &str) -> Option<String> {
+    let parsed = url::Url::parse(uri).ok()?;
+    if parsed.scheme() != "bitter"
+        || parsed.host_str() != Some("history")
+        || parsed.path() != "/delete"
+    {
+        return None;
+    }
+    parsed
+        .query_pairs()
+        .find_map(|(name, value)| (name == "url").then(|| value.into_owned()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1563,6 +1610,33 @@ mod tests {
         assert_eq!(next_zoom(3.0, true), 3.0);
         assert_eq!(next_zoom(0.3, false), 0.3);
         assert_eq!(next_zoom(5.0, false), 3.0);
+    }
+
+    #[test]
+    fn internal_history_delete_target_accepts_only_history_delete_actions() {
+        let encoded: String =
+            url::form_urlencoded::byte_serialize(b"https://example.test/?q=a b").collect();
+        let uri = format!("bitter://history/delete?url={encoded}");
+        assert_eq!(
+            internal_history_delete_target(&uri).as_deref(),
+            Some("https://example.test/?q=a b")
+        );
+        assert_eq!(
+            internal_history_delete_target("bitter://history/delete"),
+            None
+        );
+        assert_eq!(
+            internal_history_delete_target("bitter://history/delete?other=x"),
+            None
+        );
+        assert_eq!(
+            internal_history_delete_target("bitter://bookmarks/delete?url=x"),
+            None
+        );
+        assert_eq!(
+            internal_history_delete_target("https://history/delete?url=x"),
+            None
+        );
     }
 
     #[test]
