@@ -287,4 +287,54 @@ mod tests {
         fs::set_permissions(&data, fs::Permissions::from_mode(0o755)).unwrap();
         assert!(matches!(err, Err(ProfileError::Access { .. })));
     }
+
+    #[test]
+    fn open_uses_xdg_directories() {
+        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _guard = LOCK.lock().unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let config = root.path().join("config");
+        let data = root.path().join("data");
+        let cache = root.path().join("cache");
+        let old_config = std::env::var_os("XDG_CONFIG_HOME");
+        let old_data = std::env::var_os("XDG_DATA_HOME");
+        let old_cache = std::env::var_os("XDG_CACHE_HOME");
+        unsafe {
+            std::env::set_var("XDG_CONFIG_HOME", &config);
+            std::env::set_var("XDG_DATA_HOME", &data);
+            std::env::set_var("XDG_CACHE_HOME", &cache);
+        }
+        let profile = Profile::open().unwrap();
+        assert_eq!(
+            profile.config_path(),
+            config.join("bitter-browser/config.toml")
+        );
+        unsafe {
+            match old_config {
+                Some(value) => std::env::set_var("XDG_CONFIG_HOME", value),
+                None => std::env::remove_var("XDG_CONFIG_HOME"),
+            }
+            match old_data {
+                Some(value) => std::env::set_var("XDG_DATA_HOME", value),
+                None => std::env::remove_var("XDG_DATA_HOME"),
+            }
+            match old_cache {
+                Some(value) => std::env::set_var("XDG_CACHE_HOME", value),
+                None => std::env::remove_var("XDG_CACHE_HOME"),
+            }
+        }
+        drop(profile);
+    }
+
+    #[test]
+    fn rejects_a_lock_file_that_is_not_a_regular_file() {
+        let root = tempfile::tempdir().unwrap();
+        let data = root.path().join(PROFILE_DIR);
+        fs::create_dir(&data).unwrap();
+        let lock = data.join("profile.lock");
+        let c_path = std::ffi::CString::new(lock.as_os_str().as_encoded_bytes()).unwrap();
+        let rc = unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) };
+        assert_eq!(rc, 0);
+        assert!(Profile::open_at(root.path(), root.path(), root.path()).is_err());
+    }
 }

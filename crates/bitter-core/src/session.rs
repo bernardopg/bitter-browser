@@ -246,27 +246,35 @@ mod tests {
     }
 
     #[test]
-    fn load_rejects_unreadable_and_oversized_files() {
-        use std::os::unix::fs::PermissionsExt;
+    fn load_and_save_reject_invalid_paths_and_oversized_files() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("session.json");
         std::fs::write(&path, vec![b' '; MAX_BYTES + 1]).unwrap();
         assert!(load(&path).is_err());
 
-        std::fs::write(
-            &path,
-            r#"{"version":1,"session":{"workspace":"main","workspaces":[{"tabs":[],"selected":0},{"tabs":[],"selected":0}]}}"#,
-        )
-        .unwrap();
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
-        let result = load(&path);
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
-        assert!(result.is_err());
-    }
+        assert!(save(Path::new("/"), Session::default()).is_err());
+        let mut session = Session::default();
+        session.workspaces[0].tabs = vec![
+            SavedTab {
+                uri: "x".repeat(30_000),
+                title: "big".into(),
+            };
+            80
+        ];
+        assert!(save(&dir.path().join("big.json"), session).is_err());
 
-    #[test]
-    fn save_rejects_missing_parent_directory() {
-        let err = save(Path::new("/"), Session::default()).unwrap_err();
-        assert_eq!(err.kind(), io::ErrorKind::Other);
+        let target = dir.path().join("dir.json");
+        std::fs::create_dir(&target).unwrap();
+        assert!(save(&target, Session::default()).is_err());
+
+        let unreadable = dir.path().join("unreadable.json");
+        std::fs::write(&unreadable, b"{}").unwrap();
+        let mut perms = std::fs::metadata(&unreadable).unwrap().permissions();
+        std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o000);
+        std::fs::set_permissions(&unreadable, perms.clone()).unwrap();
+        let result = load(&unreadable);
+        std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o644);
+        std::fs::set_permissions(&unreadable, perms).unwrap();
+        assert!(result.is_err());
     }
 }

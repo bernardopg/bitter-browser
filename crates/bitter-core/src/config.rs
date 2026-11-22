@@ -439,6 +439,49 @@ mod tests {
     }
 
     #[test]
+    fn read_config_rejects_invalid_utf8_and_non_regular_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(&path, [0xff, 0xfe, 0xfd]).unwrap();
+        assert!(ConfigStore::open(path.clone()).is_err());
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        assert!(ConfigStore::open(path.clone()).is_err());
+        std::fs::remove_dir(&path).unwrap();
+        std::fs::write(&path, b"version = 1").unwrap();
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o000);
+        std::fs::set_permissions(&path, perms.clone()).unwrap();
+        let result = ConfigStore::open(path.clone());
+        std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o644);
+        std::fs::set_permissions(&path, perms).unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn save_rejects_missing_parent_and_oversized_documents() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let mut store = ConfigStore::open(path).unwrap();
+        store.document["padding"] = value("x".repeat(MAX_BYTES));
+        assert!(matches!(
+            store.save(Preferences::default()),
+            Err(ConfigError {
+                source: ConfigFailure::TooLarge,
+                ..
+            })
+        ));
+
+        let mut root_store = ConfigStore {
+            path: PathBuf::from("/"),
+            original: None,
+            document: DocumentMut::new(),
+            current: Preferences::default(),
+        };
+        assert!(root_store.save(Preferences::default()).is_err());
+    }
+
+    #[test]
     fn interrupted_save_and_external_edits_keep_the_original_and_effective_values() {
         let profile = tempfile::tempdir().unwrap();
         let path = profile.path().join("config.toml");

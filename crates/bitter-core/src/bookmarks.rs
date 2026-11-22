@@ -224,11 +224,22 @@ mod tests {
         let read_only = Bookmarks::open_for_search(dir.path()).unwrap();
         assert_eq!(read_only.search("a.test").unwrap()[0].0, "https://a.test/");
         assert!(read_only.is_bookmarked("https://a.test/").unwrap());
+        let missing = tempfile::tempdir().unwrap();
+        assert!(Bookmarks::open_for_search(missing.path()).is_err());
     }
 
     #[test]
-    fn open_for_search_reports_missing_database() {
+    fn broken_database_reports_errors() {
         let dir = tempfile::tempdir().unwrap();
-        assert!(Bookmarks::open_for_search(dir.path()).is_err());
+        let bookmarks = Bookmarks::open(dir.path()).unwrap();
+        bookmarks
+            .conn
+            .execute_batch("DROP TABLE bookmarks;")
+            .unwrap();
+        assert!(bookmarks.is_bookmarked("https://a.test/").is_err());
+        assert!(bookmarks.get_all().is_err());
+        assert!(bookmarks.search("a").is_err());
+        assert!(bookmarks.add_bookmark("https://a.test/", None).is_err());
+        assert!(bookmarks.remove_bookmark("https://a.test/").is_err());
     }
 }
