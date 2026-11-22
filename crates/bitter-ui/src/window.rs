@@ -1274,10 +1274,9 @@ impl Browser {
                 return false;
             };
             let request_uri = action.request().and_then(|request| request.uri());
-            if kind == NavigationAction
-                && action.is_user_gesture()
+            if action.is_user_gesture()
                 && let Some(uri) = request_uri.as_deref()
-                && let Some(changed) = browser.handle_internal_action(uri)
+                && let Some(changed) = browser.handle_internal_action(&tab.uri(), uri)
             {
                 if changed && let Some(view) = tab.view.get() {
                     browser.reload_internal_page(&tab, view);
@@ -1407,7 +1406,13 @@ impl Browser {
         }
     }
 
-    fn handle_internal_action(&self, uri: &str) -> Option<bool> {
+    /// Runs an action link from an internal page. Only the history page
+    /// itself may trigger these: a web page linking to the same address must
+    /// not be able to delete the user's history.
+    fn handle_internal_action(&self, source: &str, uri: &str) -> Option<bool> {
+        if !is_internal_action_source(source) {
+            return None;
+        }
         let target = internal_history_delete_target(uri)?;
         match self.history.remove(&target) {
             Ok(true) => Some(true),
@@ -1584,6 +1589,10 @@ fn navigation_target(input: &str, engine: SearchEngine) -> Result<Option<Target>
     Ok(Some(Target::Search(engine.search_url(input))))
 }
 
+fn is_internal_action_source(source: &str) -> bool {
+    source == "bitter://history"
+}
+
 fn internal_history_delete_target(uri: &str) -> Option<String> {
     let parsed = url::Url::parse(uri).ok()?;
     if parsed.scheme() != "bitter"
@@ -1610,6 +1619,17 @@ mod tests {
         assert_eq!(next_zoom(3.0, true), 3.0);
         assert_eq!(next_zoom(0.3, false), 0.3);
         assert_eq!(next_zoom(5.0, false), 3.0);
+    }
+
+    #[test]
+    fn only_the_history_page_may_run_internal_actions() {
+        assert!(is_internal_action_source("bitter://history"));
+        assert!(!is_internal_action_source("bitter://bookmarks"));
+        assert!(!is_internal_action_source("bitter://newtab"));
+        assert!(!is_internal_action_source("https://evil.test/"));
+        assert!(!is_internal_action_source(
+            "https://evil.test/bitter://history"
+        ));
     }
 
     #[test]
