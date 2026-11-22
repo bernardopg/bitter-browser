@@ -17,6 +17,10 @@ use webkit6::{UserContentFilter, UserContentFilterStore, UserContentManager};
 const REFRESH_AFTER: Duration = Duration::from_secs(4 * 24 * 60 * 60);
 /// How often the browser checks whether lists need refreshing.
 const CHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
+/// Upper bound for a downloaded filter list before conversion. EasyList and
+/// EasyPrivacy are a few megabytes; anything much larger is treated as invalid
+/// or hostile input rather than read into memory.
+const MAX_FILTER_LIST_BYTES: u64 = 8 * 1024 * 1024;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -383,6 +387,15 @@ impl ContentBlocker {
 
     /// Replaces the saved list with a download that looks like a filter list.
     fn accept_download(&self, list: &RemoteList, partial: &Path) -> Result<String, String> {
+        let size = std::fs::metadata(partial)
+            .map_err(|error| error.to_string())?
+            .len();
+        if size > MAX_FILTER_LIST_BYTES {
+            return Err(format!(
+                "{} exceeded the {MAX_FILTER_LIST_BYTES} byte filter list limit",
+                list.url
+            ));
+        }
         let text = std::fs::read_to_string(partial).map_err(|error| error.to_string())?;
         if !bitter_adblock::looks_like_filter_list(&text) {
             return Err(format!("{} did not return a filter list", list.url));
@@ -504,5 +517,22 @@ mod tests {
                 .accept_download(list, &dir.path().join("missing.part"))
                 .is_err()
         );
+    }
+
+    #[test]
+    fn accept_download_rejects_oversized_lists() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("filter-lists")).unwrap();
+        let blocker = ContentBlocker::new(
+            &dir.path().join("compiled"),
+            dir.path().join("filter-lists"),
+        );
+        let list = &REMOTE_LISTS[0];
+        let partial = dir.path().join("easylist.txt.part");
+        let file = std::fs::File::create(&partial).unwrap();
+        file.set_len(MAX_FILTER_LIST_BYTES + 1).unwrap();
+        let error = blocker.accept_download(list, &partial).unwrap_err();
+        assert!(error.contains("filter list limit"));
+        assert!(!blocker.source_path(list).exists());
     }
 }

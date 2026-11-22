@@ -170,4 +170,18 @@ mod tests {
         conn.pragma_update(None, "max_page_count", 100).unwrap();
         upgrade(&mut conn, sql, &[]).unwrap();
     }
+
+    #[test]
+    fn open_rejects_read_only_database_files() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("readonly.sqlite");
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch("PRAGMA user_version = 1;").unwrap();
+        drop(conn);
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o444)).unwrap();
+        let result = open(&path, "", &[]);
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(result.is_err());
+    }
 }
