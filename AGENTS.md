@@ -19,21 +19,74 @@ files.
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked
 cargo audit                      # needs cargo-audit installed
-xvfb-run -a dbus-run-session -- cargo test --workspace --locked
+scripts/headless-session.sh -- cargo test --workspace --locked
 ```
 
-- WebKit tests need a display and a session bus. Run them under
-  `xvfb-run -a dbus-run-session`, as CI does.
+- WebKit tests need a display and a session bus. Run them through
+  `scripts/headless-session.sh`, as CI does, never through a bare
+  `xvfb-run -a dbus-run-session`. See
+  [Display tests](#display-tests-headless-session).
 - Tests that create WebKit objects or use the global GLib main context must
   hold the test lock in their module (see `content_blocking.rs`). Parallel
   test threads otherwise panic or abort the test binary.
 - Browser behavior changes also need the smoke test:
-  `cargo build -p bitter-ui --locked && xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- timeout 180s python3 scripts/daily-smoke.py target/debug/bitter-ui`.
+  `cargo build -p bitter-ui --locked && scripts/headless-session.sh --screen 1440x1000x24 -- timeout 180s python3 scripts/daily-smoke.py target/debug/bitter-ui`.
 - After changing `Cargo.lock`, run `scripts/update-flatpak-sources.sh` and
   commit `flatpak/cargo-sources.json`.
 - Give each git worktree its own `target/` directory. A shared
   `CARGO_TARGET_DIR` mixes path dependencies from different checkouts and
   produces false compile errors.
+
+## Display tests (headless session)
+
+Run every command that needs a display or a session bus (`cargo test`,
+`cargo llvm-cov`, the ignored preferences test, `scripts/daily-smoke.py`)
+through `scripts/headless-session.sh`:
+
+```sh
+scripts/headless-session.sh -- cargo test --workspace --locked
+GTK_A11Y=none GDK_BACKEND=x11 GSK_RENDERER=cairo \
+  scripts/headless-session.sh -- \
+  cargo test -p bitter-ui --locked settings_widgets_save_restore_and_report_errors -- --ignored
+cargo build -p bitter-ui --locked
+scripts/headless-session.sh --screen 1440x1000x24 -- \
+  timeout 180s python3 scripts/daily-smoke.py target/debug/bitter-ui
+```
+
+The script runs the same pair as before (Xvfb plus a new session bus from
+`dbus-run-session`) and adds two protections for runs on a developer
+desktop:
+
+- **A private, temporary `XDG_RUNTIME_DIR`** (mode 0700, removed at exit).
+  `dbus-run-session` creates a new bus, but the services that bus activates
+  (`xdg-document-portal`, `xdg-desktop-portal` and its backends) inherit
+  `XDG_RUNTIME_DIR`. On a desktop that is `/run/user/<uid>`, shared with the
+  real session. The test session's document portal took over
+  `/run/user/<uid>/doc` and unmounted it when the test ended. The desktop's
+  own `xdg-document-portal.service` then exited with status 21 and stayed
+  failed, so Flatpak apps lost file access until the next login. This
+  happened on every local smoke run (found on 2026-11-22).
+  `scripts/daily-smoke.py` already gives the browser process its own
+  runtime directory, but that never reached the bus-activated portals.
+- **No desktop session variables** (`WAYLAND_DISPLAY`,
+  `XDG_CURRENT_DESKTOP`, `HYPRLAND_INSTANCE_SIGNATURE` and others). With
+  `XDG_CURRENT_DESKTOP=Hyprland` inherited, the test bus started
+  `xdg-desktop-portal-hyprland`, which segfaults without a compositor and
+  left a coredump on every run.
+
+CI runners have no desktop session, so CI never showed either problem. CI
+uses the script anyway, so local and CI runs are identical.
+
+- A crash of `bitter_ui-<hash>` (the test binary) or `bitter-ui` under
+  `target/` during these runs is a failure to investigate here, not system
+  noise.
+- The script cleans up after itself. If a run is killed with `SIGKILL`, a
+  `/tmp/bitter-runtime.*` directory can remain. Unmount the `doc` mount
+  inside it with `fusermount3 -u` before you remove it, because its files
+  map to real user files.
+- Check that a run left the desktop intact:
+  `systemctl --user --failed` lists no `xdg-*portal*` unit, and
+  `mountpoint /run/user/$(id -u)/doc` still reports a mount point.
 
 ## Code navigation: tokensave
 

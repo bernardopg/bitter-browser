@@ -7,6 +7,16 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Display tests, the ignored preferences test and the smoke test run through
+  `scripts/headless-session.sh`, in CI and locally. It wraps
+  `xvfb-run -a dbus-run-session` with a private `XDG_RUNTIME_DIR` and
+  without the desktop session variables. A bare `dbus-run-session` on a
+  desktop let the test bus take over `/run/user/<uid>/doc`, which left the
+  desktop's `xdg-document-portal` failed (Flatpak apps lost file access),
+  and crashed `xdg-desktop-portal-hyprland` on every run.
+
 ## [0.4.0] - 2026-11-22
 
 ### Added

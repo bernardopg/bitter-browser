@@ -147,7 +147,7 @@ Run the local WebKit smoke test and optionally collect startup samples.
 
 ```sh
 cargo build -p bitter-ui --locked
-xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- \
+scripts/headless-session.sh --screen 1440x1000x24 -- \
   python3 scripts/daily-smoke.py target/debug/bitter-ui --benchmark-samples 5
 ```
 
