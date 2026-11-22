@@ -120,21 +120,23 @@ store, `.headroom/` at the repository root (`memory.db`,
 project memories to an agent-specific store, such as Claude Code memory
 files or Codex memories; other agents cannot read them.
 
-- The `memory_*` tools (`memory_search`, `memory_save`, `memory_update`,
-  `memory_delete`, `memory_list`) are injected by the Headroom proxy
-  (`headroom.service`, started with `--memory`). With project storage the
-  proxy keeps one store per project in
-  `~/.headroom/memories/projects/bitter-browser-<hash>/`. On the owner's
-  machine that directory is a symbolic link to `<repo>/.headroom`, so the
-  tools and the `headroom memory` CLI (whose default is
-  `./.headroom/memory.db`) use the same store. On a new machine, create the
-  link once (check `~/.headroom/logs/proxy-*.log` for the
-  `memory_project_resolved` path), then run
-  `systemctl --user restart headroom.service`.
-- Start agents from the repository root. A worktree resolves to a different
-  project key; from a worktree, pass
-  `--db-path <repo>/.headroom/memory.db` to the CLI and save memories from a
-  session started at the root.
+- Three ways reach the same store: the `memory_*` tools injected by the
+  Headroom proxy (`headroom.service`, `--memory`), the `headroom_memory` MCP
+  server (`mcp__headroom_memory__memory_*`, via
+  `~/.local/bin/headroom-memory-mcp`), and the `headroom memory` CLI run
+  from the repository root. Worktrees and subdirectories resolve to the
+  main repository's `.headroom/`.
+- The proxy keeps a store per directory in
+  `~/.headroom/memories/projects/`. A `SessionStart` hook runs
+  `headroom-project-memory`, which links that directory to `.headroom/` and
+  merges anything already stored there. Run it by hand from the repository
+  root, or check a path with `headroom-project-memory --check .`, if memory
+  tools write somewhere else. The full machine setup is in the owner's
+  global rule `~/claude-env/rules/headroom-memory.md` (also in
+  `~/.codex/AGENTS.md`).
+- Only `headroom.service` runs a proxy on port 8791. Do not run
+  `headroom init`, `headroom install apply` or `headroom init hook ensure`:
+  they start a second proxy without memory that takes the port.
 - Before saving, search: `memory_search` with a natural-language query (add
   `entities` to filter). Update an existing memory with `memory_update`
   instead of saving a duplicate; remove a wrong or obsolete one with
@@ -152,6 +154,8 @@ files or Codex memories; other agents cannot read them.
   `headroom memory show <id>`, `headroom memory stats` and
   `headroom memory export --output <file>.json` (back up before
   `headroom memory prune` or `purge`).
+  Import with `headroom memory import <file>.json --force`, then run
+  `headroom-project-memory` so the vectors are indexed.
 
 ## Branches and pull requests
 
