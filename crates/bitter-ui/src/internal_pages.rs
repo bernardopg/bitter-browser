@@ -127,17 +127,26 @@ pub fn list(look: &Look, kind: ListKind, rows: &[(String, String)]) -> String {
             label = escape_html(label),
             url = escape_html(url),
         );
+        let remove = if matches!(kind, ListKind::History) {
+            let encoded: String = url::form_urlencoded::byte_serialize(url.as_bytes()).collect();
+            format!(
+                r#"<a class="remove" href="bitter://history/delete?url={encoded}" aria-label="Remove from history" title="Remove from history">&#xd7;</a>"#,
+                encoded = escape_html(&encoded),
+            )
+        } else {
+            String::new()
+        };
         if linkable(url) {
             let _ = write!(
                 items,
-                r#"<a class="row" href="{href}" data-search="{search}">{inner}</a>"#,
+                r#"<div class="row" data-search="{search}"><a class="entry" href="{href}">{inner}</a>{remove}</div>"#,
                 href = escape_html(url),
                 search = escape_html(&search),
             );
         } else {
             let _ = write!(
                 items,
-                r#"<div class="row inert" data-search="{search}">{inner}</div>"#,
+                r#"<div class="row inert" data-search="{search}"><div class="entry">{inner}</div>{remove}</div>"#,
                 search = escape_html(&search),
             );
         }
@@ -337,10 +346,16 @@ a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline
 }
 .filter:focus { outline: none; box-shadow: 0 0 0 2px var(--accent); }
 .list { display: grid; gap: 2px; padding: 6px; border-radius: 16px; background: var(--card); box-shadow: var(--shadow); animation: rise .35s cubic-bezier(.2,.8,.2,1) both; }
-.row { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 11px; transition: background-color .14s ease; }
+.row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 11px; transition: background-color .14s ease; }
 .row:hover { background: var(--card-hover); }
 .row[hidden] { display: none; }
 .row.inert { opacity: .7; }
+.entry { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; color: inherit; text-decoration: none; }
+.remove {
+  flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px;
+  border-radius: 8px; color: var(--muted); font-size: 18px; line-height: 1; text-decoration: none;
+}
+.remove:hover, .remove:focus-visible { background: color-mix(in srgb, var(--fg) 8%, transparent); color: var(--fg); }
 .text { display: grid; min-width: 0; }
 .title, .url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .title { font-weight: 550; }
@@ -419,9 +434,27 @@ mod tests {
             ("javascript:alert(1)".to_owned(), "Bad".to_owned()),
         ];
         let html = list(&Look::default(), ListKind::History, &rows);
-        assert!(html.contains("<a class=\"row\""));
-        assert!(html.contains("<div class=\"row inert\""));
+        assert!(html.contains(r#"<a class="entry" href="file:///tmp/a.txt">"#));
+        assert!(html.contains(r#"<div class="row inert""#));
+        assert!(html.contains(r#"<div class="entry">"#));
         assert!(!html.contains("href=\"javascript:"));
+    }
+
+    #[test]
+    fn history_rows_include_remove_actions_but_bookmarks_do_not() {
+        let rows = vec![(
+            "https://example.test/?q=a&b=<x>".to_owned(),
+            "Example".to_owned(),
+        )];
+        let history = list(&Look::default(), ListKind::History, &rows);
+        assert!(history.contains(r#"class="remove""#));
+        assert!(history.contains("bitter://history/delete?url="));
+        assert!(history.contains("aria-label=\"Remove from history\""));
+        assert!(!history.contains("href=\"https://example.test/?q=a&b=<x>\""));
+
+        let bookmarks = list(&Look::default(), ListKind::Bookmarks, &rows);
+        assert!(!bookmarks.contains("bitter://history/delete"));
+        assert!(!bookmarks.contains(r#"class="remove""#));
     }
 
     #[test]
