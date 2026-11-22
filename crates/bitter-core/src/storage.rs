@@ -128,6 +128,21 @@ mod tests {
     }
 
     #[test]
+    fn read_only_main_database_is_rejected() {
+        let profile = tempfile::tempdir().unwrap();
+        let path = profile.path().join("readonly.sqlite");
+        drop(Connection::open(&path).unwrap());
+        let mut perms = fs::metadata(&path).unwrap().permissions();
+        use std::os::unix::fs::PermissionsExt;
+        perms.set_mode(0o444);
+        fs::set_permissions(&path, perms.clone()).unwrap();
+        let result = open(&path, "CREATE TABLE example (id INTEGER);", &[]);
+        perms.set_mode(0o644);
+        fs::set_permissions(&path, perms).unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn disk_full_rolls_back_schema_and_version_and_allows_retry() {
         let profile = tempfile::tempdir().unwrap();
         let path = profile.path().join("full.sqlite");

@@ -187,17 +187,35 @@ impl FindBar {
     }
 
     fn show_count(&self, count: u32) {
-        let label = match count {
-            0 => "No matches".to_owned(),
-            1 => "1 match".to_owned(),
-            MAX_MATCHES.. => format!("{MAX_MATCHES}+ matches"),
-            count => format!("{count} matches"),
-        };
-        self.matches.set_label(&label);
+        self.matches.set_label(&match_label(count));
         if count == 0 {
             self.entry.add_css_class("error");
         } else {
             self.entry.remove_css_class("error");
         }
+    }
+}
+
+fn match_label(count: u32) -> String {
+    match count {
+        0 => "No matches".to_owned(),
+        1 => "1 match".to_owned(),
+        MAX_MATCHES.. => format!("{MAX_MATCHES}+ matches"),
+        count => format!("{count} matches"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MAX_MATCHES, match_label};
+
+    #[test]
+    fn match_label_reports_counts_and_caps_at_limit() {
+        assert_eq!(match_label(0), "No matches");
+        assert_eq!(match_label(1), "1 match");
+        assert_eq!(match_label(2), "2 matches");
+        assert_eq!(match_label(MAX_MATCHES - 1), "999 matches");
+        assert_eq!(match_label(MAX_MATCHES), "1000+ matches");
+        assert_eq!(match_label(MAX_MATCHES + 5), "1000+ matches");
     }
 }
