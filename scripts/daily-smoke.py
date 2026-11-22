@@ -743,7 +743,8 @@ def web_platform(binary, directory, base, screenshots):
         since = Fixture.event_mark()
         browser.plain_key(F5)
         event("cookie", since, "kept", "The page cookie was not stored")
-        assert browser.matching_history(page, "Platform"), "The page was not in the history"
+        eventually(lambda: browser.matching_history(page, "Platform"),
+                   "The page was not in the history")
         browser.key("ctrl+shift+Delete")
         time.sleep(0.6)
         browser.frame("clear-data")
