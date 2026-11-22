@@ -400,6 +400,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn permission_labels_are_human_readable() {
+        assert_eq!(Permission::Notifications.label(), "Notifications");
+        assert_eq!(Permission::Location.label(), "Location");
+        assert_eq!(Permission::Camera.label(), "Camera");
+        assert_eq!(Permission::Microphone.label(), "Microphone");
+        assert_eq!(Permission::Clipboard.label(), "Read clipboard");
+    }
+
+    #[test]
     fn site_permissions_persist_per_origin_and_reject_non_web_origins() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("site-settings.json");
@@ -557,7 +566,44 @@ mod tests {
         assert!(ZoomLevels::open(path.clone()).1.is_some());
         std::fs::remove_file(&path).unwrap();
         std::os::unix::fs::symlink(dir.path().join("elsewhere"), &path).unwrap();
+        assert!(ZoomLevels::open(path.clone()).1.is_some());
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        assert!(ZoomLevels::open(path.clone()).1.is_some());
+        std::fs::remove_dir(&path).unwrap();
+        std::fs::write(&path, vec![b' '; super::MAX_BYTES + 1]).unwrap();
         assert!(ZoomLevels::open(path).1.is_some());
+    }
+
+    #[test]
+    fn forget_unknown_host_is_a_noop() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut zoom, _) = ZoomLevels::open(dir.path().join("zoom.json"));
+        zoom.forget("missing.test").unwrap();
+        assert!(zoom.sites.is_empty());
+    }
+
+    #[test]
+    fn save_rejects_paths_without_parent_and_oversized_payloads() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("zoom.json");
+        let (mut zoom, _) = ZoomLevels::open(path);
+        assert!(save(Path::new("/"), ZOOM_VERSION, &ZoomData::default()).is_err());
+        zoom.sites = (0..60_000)
+            .map(|index| (format!("site-{index}-{}.example.test", "x".repeat(20)), 1.0))
+            .collect();
+        assert!(zoom.write().is_err());
+        let target = dir.path().join("dir-target.json");
+        std::fs::create_dir(&target).unwrap();
+        let (mut list, _) = DownloadList::open(target.clone());
+        list.records.push(DownloadRecord {
+            path: dir.path().join("file"),
+            source: "https://example.test/".into(),
+            size: 0,
+            finished: 0,
+            outcome: DownloadOutcome::Completed,
+        });
+        assert!(list.write().is_err());
     }
 
     #[test]

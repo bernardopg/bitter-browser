@@ -81,6 +81,7 @@ mod tests {
         drop(history);
 
         let worker = SuggestionWorker::new(dir.path().to_owned()).unwrap();
+        drop(worker.submit("cancelled".into()));
         let result = wait_for(worker.submit("example".into()));
         assert_eq!(
             result.bookmarks,
