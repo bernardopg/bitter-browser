@@ -144,6 +144,14 @@ impl History {
         };
         Ok(removed)
     }
+
+    /// Removes a single page from history. Returns whether a row was removed.
+    pub fn remove(&self, url: &str) -> Result<bool> {
+        let removed = self
+            .conn
+            .execute("DELETE FROM history WHERE url = ?1", [url])?;
+        Ok(removed > 0)
+    }
 }
 
 fn history_fts_query(query: &str) -> Option<String> {
@@ -388,5 +396,27 @@ mod tests {
         // A missing database is an error, not a silent empty one.
         let missing = tempfile::tempdir().unwrap();
         assert!(History::open_for_search(missing.path()).is_err());
+    }
+
+    #[test]
+    fn remove_deletes_a_single_entry_and_its_search_record() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::open(dir.path()).unwrap();
+        history
+            .add_visit("https://keep.test/", Some("Keep page"))
+            .unwrap();
+        history
+            .add_visit("https://drop.test/", Some("Drop page"))
+            .unwrap();
+
+        assert!(history.remove("https://drop.test/").unwrap());
+        assert!(!history.remove("https://drop.test/").unwrap());
+
+        assert_eq!(
+            history.recent(10).unwrap(),
+            [("https://keep.test/".to_owned(), "Keep page".to_owned())]
+        );
+        assert!(history.search("Drop").unwrap().is_empty());
+        assert_eq!(history.search("Keep").unwrap().len(), 1);
     }
 }
