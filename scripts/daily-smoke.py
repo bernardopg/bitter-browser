@@ -813,6 +813,43 @@ def web_platform(binary, directory, base, screenshots):
         event("notification", since, "granted", "The remembered answer was not given to the page")
         event("query", since, "granted", "navigator.permissions did not report the answer")
 
+        # Same host, different port. The origin boundary includes the port.
+        with ThreadingHTTPServer(("127.0.0.1", 0), Fixture) as other:
+            threading.Thread(target=other.serve_forever, daemon=True).start()
+            second_origin = f"http://127.0.0.1:{other.server_port}"
+            try:
+                since = Fixture.event_mark()
+                browser.enter(f"{second_origin}/platform")
+                event("notification", since, "default")
+                event("query", since, "prompt", "The first origin's grant leaked across ports")
+
+                browser.click(left + 40, top + 85)
+                time.sleep(0.8)
+                browser.frame("notification-denial")
+                browser.click(width - 125, top + 25)
+                event("requested", since, "denied", "Blocking notifications did not reach the page")
+                expected = [
+                    {"origin": base, "permission": "notifications", "allowed": True},
+                    {"origin": second_origin, "permission": "notifications", "allowed": False},
+                ]
+                eventually(
+                    lambda: sorted(json.loads(settings.read_text())["permissions"], key=lambda item: item["origin"])
+                    == sorted(expected, key=lambda item: item["origin"]),
+                    "The two origin decisions were not stored independently",
+                )
+
+                since = Fixture.event_mark()
+                browser.plain_key(F5)
+                event("notification", since, "denied", "The denial did not survive reload")
+                event("query", since, "denied")
+            finally:
+                other.shutdown()
+
+        since = Fixture.event_mark()
+        browser.enter(page)
+        event("notification", since, "granted", "Denying the second origin changed the first grant")
+        event("query", since, "granted")
+
         browser.xdotool("mousemove", "--window", browser.window, str(left + 50), str(top + 140))
         time.sleep(0.5)
         browser.frame("link-status")
@@ -869,6 +906,7 @@ def web_platform(binary, directory, base, screenshots):
     finally:
         browser.stop()
     return {"popup_opener": True, "notification_remembered": True, "context_menu_tab": True,
+            "notification_denied": True, "notification_origin_isolation": True,
             "devtools": True, "element_hiding": True, "cleared_history_and_cookies": True}
 
 
