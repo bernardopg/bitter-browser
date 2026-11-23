@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Result};
+use rusqlite::{Connection, OptionalExtension, Result};
 
 pub struct Bookmarks {
     conn: Connection,
@@ -58,6 +58,26 @@ impl Bookmarks {
         )?;
 
         Ok(count > 0)
+    }
+
+    /// Returns the saved display title, or None if the page is not bookmarked.
+    pub fn title(&self, url: &str) -> Result<Option<String>> {
+        self.conn
+            .query_row(
+                "SELECT COALESCE(NULLIF(title, ''), url) FROM bookmarks WHERE url = ?1",
+                [url],
+                |row| row.get(0),
+            )
+            .optional()
+    }
+
+    /// Changes the title of an existing bookmark without moving it in the list.
+    pub fn rename(&self, url: &str, title: &str) -> Result<bool> {
+        let changed = self.conn.execute(
+            "UPDATE bookmarks SET title = ?2 WHERE url = ?1",
+            rusqlite::params![url, title],
+        )?;
+        Ok(changed != 0)
     }
 
     pub fn get_all(&self) -> Result<Vec<(String, String)>> {
@@ -173,6 +193,32 @@ mod tests {
         );
         bookmarks.remove_bookmark("https://a.test/").unwrap();
         assert!(!bookmarks.is_bookmarked("https://a.test/").unwrap());
+    }
+
+    #[test]
+    fn rename_persists_without_creating_missing_bookmarks_or_changing_order() {
+        let profile = tempfile::tempdir().unwrap();
+        let bookmarks = Bookmarks::open(profile.path()).unwrap();
+        let first = "https://example.test/first";
+        let second = "https://example.test/second";
+        let missing = "https://example.test/missing";
+        bookmarks.add_bookmark(first, None).unwrap();
+        bookmarks.add_bookmark(second, Some("Second")).unwrap();
+        assert_eq!(bookmarks.title(first).unwrap().as_deref(), Some(first));
+        assert_eq!(bookmarks.title(missing).unwrap(), None);
+        assert!(bookmarks.rename(first, "New favorite").unwrap());
+        assert!(!bookmarks.rename(missing, "Do not create").unwrap());
+        drop(bookmarks);
+
+        let bookmarks = Bookmarks::open(profile.path()).unwrap();
+        assert_eq!(
+            bookmarks.get_all().unwrap(),
+            vec![
+                (second.to_owned(), "Second".to_owned()),
+                (first.to_owned(), "New favorite".to_owned()),
+            ]
+        );
+        assert_eq!(bookmarks.search("favorite").unwrap().len(), 1);
     }
 
     #[test]
