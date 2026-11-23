@@ -51,3 +51,6 @@ security, compatibility and quality gates in the [roadmap](../TASKS.md) have
 evidence. Automated CI, dependency audit and signed release artifacts are
 required. A missing or failing P0 gate blocks the production designation. See
 [CI and releases](ci-release.md) for the release procedure.
+
+Use the [production release gates](release-gates.md) to record the candidate
+evidence and sign-off.

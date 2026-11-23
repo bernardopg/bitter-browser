@@ -5,10 +5,9 @@ on Bitter Browser (Claude Code, Codex, Cursor and others). `CLAUDE.md` only
 imports it. Change the rules here, never in a copy.
 
 Bitter Browser is a Linux web browser in Rust (GTK 4, libadwaita,
-WebKitGTK 6). The workspace has six crates: `bitter-core` (profile, SQLite
+WebKitGTK 6). The workspace has four crates: `bitter-core` (profile, SQLite
 history and bookmarks, settings), `bitter-adblock` (filter list conversion),
-`bitter-ui` (the browser), `bitter-cli` (the `bitter-cli` launcher), and the
-unused scaffolds `bitter-net` and `bitter-devtools`. Read
+`bitter-ui` (the browser), and `bitter-cli` (the launcher). Read
 [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and
 [docs/ci-release.md](docs/ci-release.md) before changing build, CI or release
 files.
