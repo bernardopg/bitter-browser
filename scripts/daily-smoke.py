@@ -9,6 +9,7 @@ import re
 import shutil
 import socket
 import sqlite3
+import ssl
 import subprocess
 import tempfile
 import threading
@@ -17,8 +18,10 @@ import struct
 import zlib
 import urllib.parse
 from collections import Counter
+from http.client import HTTPSConnection
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from queue import Queue
 
 def solid_png(size, rgb):
     def chunk(kind, data):
@@ -585,6 +588,84 @@ def run_flow(browser, base):
     return {"startup_ms": round(startup * 1000), "restore_ms": round(restart * 1000)}
 
 
+def untrusted_certificate(browser, base, directory):
+    """An untrusted TLS peer must never receive an HTTP request."""
+    certificate = directory / "certificate.pem"
+    key = directory / "key.pem"
+    subprocess.run([
+        "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+        "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1",
+        "-keyout", str(key), "-out", str(certificate),
+    ], check=True, capture_output=True)
+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    # In TLS 1.2 the server observes rejection before its handshake completes.
+    context.maximum_version = ssl.TLSVersion.TLSv1_2
+    context.load_cert_chain(certificate, key)
+    handshakes = Queue()
+
+    class TlsFixture(ThreadingHTTPServer):
+        def get_request(self):
+            connection, address = super().get_request()
+            try:
+                connection.settimeout(3)
+                secure = context.wrap_socket(connection, server_side=True)
+            except OSError as error:
+                connection.close()
+                handshakes.put(error)
+                raise
+            handshakes.put(None)
+            return secure, address
+
+    path = "/untrusted-certificate"
+    with TlsFixture(("127.0.0.1", 0), Fixture) as server:
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        uri = f"https://127.0.0.1:{server.server_port}{path}"
+        try:
+            # Trust the certificate in this control client only. Prove that
+            # the same fixture can complete TLS and answer an HTTP request.
+            control = HTTPSConnection("127.0.0.1", server.server_port, timeout=3,
+                                      context=ssl.create_default_context(cafile=certificate))
+            try:
+                control.request("GET", "/tls-control")
+                response = control.getresponse()
+                assert response.status == 200
+                response.read()
+                assert handshakes.get(timeout=3) is None
+            finally:
+                control.close()
+            browser.start()
+            browser.enter(uri)
+            for attempt in ("navigation", "retry"):
+                error = handshakes.get(timeout=12)
+                # TLS backends can send a certificate alert or reset the
+                # socket when cancelling a failed certificate handshake.
+                assert isinstance(error, ConnectionResetError) or (
+                    isinstance(error, ssl.SSLError)
+                    and error.reason in {"TLSV1_ALERT_UNKNOWN_CA", "SSLV3_ALERT_BAD_CERTIFICATE"}
+                ), (attempt, error)
+                assert Fixture.count(path) == 0, "The untrusted TLS peer received an HTTP request"
+                assert not browser.matching_history(uri, "Untrusted-Certificate")
+                if attempt == "navigation":
+                    eventually(
+                        lambda: (snapshot := browser.current())
+                        and uri in tab_paths(snapshot, 0),
+                        "The failed TLS navigation was not recorded in the session",
+                    )
+                    browser.frame("untrusted-certificate")
+                    browser.key("ctrl+r")
+            healthy = f"{base}/after-tls-error"
+            browser.enter(healthy)
+            eventually(lambda: browser.matching_history(healthy, "After-Tls-Error"),
+                       "The browser could not navigate after the TLS failure")
+            assert Fixture.count(path) == 0
+        finally:
+            browser.stop()
+            server.shutdown()
+    return {"untrusted_certificate_rejected": True, "retry_rejected": True,
+            "navigation_after_tls_failure": True}
+
+
 def dialogs_and_persistence(binary, directory, base, screenshots):
     """Save dialog, uploads, and zoom and download list after a restart."""
     browser = Browser(binary, directory, screenshots)
@@ -902,6 +983,8 @@ def main():
         args.screenshots.mkdir(parents=True, exist_ok=True)
     if not shutil.which("xdotool"):
         parser.error("xdotool is required")
+    if not shutil.which("openssl"):
+        parser.error("openssl is required")
     assert os.environ.get("DISPLAY") and os.environ.get("DBUS_SESSION_BUS_ADDRESS"), "Use Xvfb and dbus-run-session"
     fixture = ThreadingHTTPServer(("127.0.0.1", 0), Fixture)
     threading.Thread(target=fixture.serve_forever, daemon=True).start()
@@ -912,6 +995,8 @@ def main():
         try:
             print(json.dumps(run_flow(browser, base)), flush=True)
             print(json.dumps(window_geometry(args.binary, directory / "geometry")), flush=True)
+            tls_browser = Browser(args.binary, directory / "tls", args.screenshots)
+            print(json.dumps(untrusted_certificate(tls_browser, base, directory)), flush=True)
             print(json.dumps(dialogs_and_persistence(args.binary, directory / "dialogs", base,
                                                      args.screenshots)), flush=True)
             print(json.dumps(web_platform(args.binary, directory / "platform", base,
