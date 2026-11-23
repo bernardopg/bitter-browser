@@ -1,9 +1,7 @@
 [workspace]
 members = [
     "crates/bitter-core",
-    "crates/bitter-net",
     "crates/bitter-adblock",
-    "crates/bitter-devtools",
     "crates/bitter-ui",
     "crates/bitter-cli"
 ]
