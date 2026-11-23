@@ -460,6 +460,7 @@ def run_flow(browser, base, launcher=None):
     browser.enter(f"{base}/first")
     eventually(lambda: browser.matching_history(f"{base}/first", "First"), "First page was not ready")
     expect("/favicon.ico")
+    check_cancelled_address_draft(browser, f"{base}/first")
     browser.enter(f"{base}/redirect")
     expect("/landing")
     eventually(lambda: browser.matching_history(f"{base}/landing", "Landing"), "Redirected title was not saved")
@@ -779,6 +780,17 @@ def dialogs_and_persistence(binary, directory, base, screenshots):
     finally:
         browser.stop()
     return {"uploaded": True, "restored_zoom_width": zoomed[1], "default_width": width}
+
+
+def check_cancelled_address_draft(browser, uri):
+    path = urllib.parse.urlsplit(uri).path
+    requests = Fixture.count(path)
+    browser.key("ctrl+l", "ctrl+a")
+    # Internal addresses never show the suggestions popover.
+    browser.xdotool("type", "--clearmodifiers", "--delay", "0", "bitter://history")
+    browser.key("Escape", "Return")
+    eventually(lambda: Fixture.count(path) == requests + 1,
+               "Escape did not restore the current address without suggestions")
 
 
 def web_platform(binary, directory, base, screenshots):

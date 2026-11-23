@@ -83,6 +83,15 @@ pub(super) fn connect(browser: &Rc<Browser>) {
     let handlers = state.clone();
     omnibar.connect_key_pressed(move |key, _| {
         use gtk4::gdk::Key;
+        if key == Key::Escape
+            && handlers
+                .browser
+                .upgrade()
+                .is_some_and(|browser| browser.toolbar.omnibar().editing())
+        {
+            handlers.dismiss();
+            return glib::Propagation::Stop;
+        }
         if !handlers.popover.is_visible() {
             return glib::Propagation::Proceed;
         }

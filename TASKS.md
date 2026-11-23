@@ -90,7 +90,7 @@ Details: [Profiles and local data](docs/profile.md),
 ## P0 — Core browsing behavior
 
 - [ ] **UI-01 — Navigation correctness.** Test address/search interpretation, back/forward/reload, redirects, page title/URL updates, loading errors and HTTP error pages; implement predictable focus, state and cancellation behavior. Depends: SEC-02.
-  *Status:* Partial. Address and search interpretation, back, forward, reload, stop, redirects, error pages and focus are implemented and covered by unit and smoke tests (#8, #10). Missing: an explicit specification of focus and cancellation.
+  *Status:* Partial. Address and search interpretation, back, forward, reload, stop, redirects, error pages and focus are implemented and covered by unit and smoke tests (#8, #10). [Daily browsing](docs/daily-browsing.md) specifies focus and cancellation. The smoke test checks restoring the active address when the draft has no suggestions.
 - [ ] **UI-02 — Tabs, windows and workspaces.** Specify ownership and lifecycle; implement and test close-last-tab, reorder, background tabs, new window, popup, workspace switch and keyboard behavior without losing state. Depends: PRD-01.
   *Status:* Partial. Workspaces, reorder, background tabs, close-last-tab, reopen and pop-ups as related tabs, with smoke tests (#8, #15). The browser has a single window. The smoke test covers closing the last tab, reopening it in place and preserving the other workspace.
 - [ ] **UI-03 — Downloads and uploads.** Implement explicit destination selection, overwrite and cancellation handling, progress, failure reporting and safe file-opening behavior; test Flatpak portal paths and untrusted filenames. Depends: SEC-02, DATA-01.

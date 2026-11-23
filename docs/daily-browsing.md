@@ -8,7 +8,7 @@
 | Move the current tab earlier or later | Alt+Shift+Left or Alt+Shift+Right |
 | Focus the address bar or command palette | Ctrl+L or Ctrl+K |
 | Back, forward or reload | Alt+Left, Alt+Right or Ctrl+R |
-| Cancel a page load or dismiss address suggestions | Escape |
+| Discard an address draft or stop a page load | Escape |
 | Find in the page, next or previous match | Ctrl+F, Ctrl+G or Ctrl+Shift+G |
 | Zoom in, zoom out or reset zoom | Ctrl+Plus, Ctrl+Minus or Ctrl+0 |
 | Enter or leave full screen | F11 (Escape also leaves) |
@@ -37,6 +37,10 @@ shows its address in the page's bottom corner. Address suggestions
 can switch to an existing tab in either workspace. History and bookmarks are
 queried locally after a 90 ms typing pause, with SQLite reads on a worker.
 Entering a search and confirming sends it to the configured provider.
+Ctrl+L focuses and selects the address. Enter commits the draft. Escape in
+the address bar restores the active tab's address and dismisses suggestions,
+including when no suggestions are shown. Escape outside an address edit
+can stop a pending load.
 Links opened from other applications open in a new tab of the running
 window. Only `http`, `https` and `file` addresses are accepted.
 
