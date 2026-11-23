@@ -46,7 +46,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [ ] **PRD-02 — Threat model.** Map untrusted pages, extensions if supported, internal pages, native processes, profiles and filesystem; document trust boundaries, attackers, security assumptions, abuse cases and residual risk. Have it independently reviewed. Depends: PRD-01.
   *Status:* [Scope revision 1](docs/threat-model.md) records boundaries, threats and verification. Independent review remains open.
 - [x] **PRD-03 — Inventory and ownership.** Audit each workspace crate, dependency, runtime, data store and UI entry point; identify owner/maintainer and choose implement, defer or remove for every placeholder. Ensure claims in README and settings match actual capabilities. Depends: PRD-01.
-  *Status:* [Component inventory](docs/components.md) records maintainers, runtime and storage owners, entry points and decisions for both scaffolds.
+  *Status:* [Component inventory](docs/components.md) records maintainers, runtime and storage owners, entry points and decisions about deferred components.
 - [ ] **PRD-04 — Quality gates.** Define measurable security, functional, compatibility, accessibility, performance, recovery and support gates; include test environments, evidence, sign-off owner and explicit release blocker policy. No gate may be satisfied solely by a coverage percentage. Depends: PRD-01, PRD-02.
   *Status:* The [production release gates](docs/release-gates.md) define evidence and release blocking criteria. Candidate execution and independent sign-off remain open.
 
@@ -105,8 +105,8 @@ Details: [Profiles and local data](docs/profile.md),
 
 ## P1 — Networking and optional product capabilities
 
-- [ ] **NET-01 — Network ownership.** Decide whether WebKit or `bitter-net` owns proxy, DNS, TLS and cookie behavior; implement only policies actually enforceable by the engine, document exceptions and test proxy/offline behavior. Depends: PRD-03, SEC-04.
-  *Status:* Not started. WebKit owns networking; `bitter-net` is a scaffold.
+- [ ] **NET-01 — Network ownership.** Define WebKit ownership of proxy, DNS, TLS and cookie behavior; implement only policies actually enforceable by the engine, document exceptions and test proxy/offline behavior. Depends: PRD-03, SEC-04.
+  *Status:* WebKit owns networking and uses platform proxy and resolver defaults. The unused scaffolds were removed. Proxy behavior on supported packages remains unverified.
 - [ ] **NET-02 — Content blocking lifecycle.** If included in v1, integrate `bitter-adblock` with requests, define filter provenance, refresh, integrity, failure and resource limits; test rules and allowlists. Otherwise defer transparently and remove false UI claims. Depends: SEC-06.
   *Status:* Partial. `bitter-adblock` converts lists, the browser downloads them over HTTPS in an ephemeral session, validates the format, rejects lists over the 8 MiB size limit, keeps the previous lists on failure, caps rules at 150,000 and refreshes every four days, with a per-site exception (#15). Missing: automated tests of network blocking and the per-site exception.
 - [x] **DEV-01 — Developer tools.** Decide whether to expose WebKit inspector or implement additional tools; gate access appropriately and test opening, closing and production defaults. Remove placeholder claims. Depends: PRD-03.
