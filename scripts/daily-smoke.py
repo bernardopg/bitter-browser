@@ -479,6 +479,7 @@ def run_flow(browser, base):
     browser.enter(f"{base}/second")
     expect("/second")
     eventually(lambda: browser.matching_history(f"{base}/second", "Second"), "Second workspace did not load")
+    check_last_tab_lifecycle(browser, f"{base}/second")
     browser.click(58, 24)
     snapshot(0, 2)
     browser.click(154, 24)
@@ -884,6 +885,38 @@ def window_geometry(binary, directory):
     finally:
         browser.stop()
     return {"default_size": default, "restored_size": restored}
+
+
+def check_last_tab_lifecycle(browser, uri):
+    """Closing the last tab affects only its workspace and is reversible."""
+    before = eventually(
+        lambda: (saved := browser.current()) and saved["workspace"] == "second"
+        and tab_paths(saved, 1) == [uri] and saved,
+        "The session did not save the second workspace's current page",
+    )
+    main_tabs = tab_paths(before, 0)
+    main_selected = before["workspaces"][0]["selected"]
+
+    def second_workspace(paths, selected):
+        saved = browser.current()
+        if not saved or saved["workspace"] != "second":
+            return False
+        assert tab_paths(saved, 0) == main_tabs, "Closing a tab changed the other workspace"
+        assert saved["workspaces"][0]["selected"] == main_selected
+        return tab_paths(saved, 1) == paths and saved["workspaces"][1]["selected"] == selected
+
+    home = "bitter://newtab"
+    browser.key("ctrl+w")
+    eventually(lambda: second_workspace([home], 0), "The last tab was not replaced with a new tab")
+    path = urllib.parse.urlsplit(uri).path
+    requests = Fixture.count(path)
+    browser.key("ctrl+shift+t")
+    eventually(lambda: second_workspace([uri, home], 0), "The closed tab was not reopened in place")
+    eventually(lambda: Fixture.count(path) == requests + 1, "The reopened tab did not load")
+    browser.key("ctrl+Page_Down")
+    eventually(lambda: second_workspace([uri, home], 1), "The replacement tab was not selectable")
+    browser.key("ctrl+w")
+    eventually(lambda: second_workspace([uri], 0), "The reopened tab was not kept selected")
 
 
 def benchmark(binary, directory, base, samples):
