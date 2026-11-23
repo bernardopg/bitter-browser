@@ -44,7 +44,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [x] **PRD-01 — Product contract.** Decide target users, supported Linux distributions/architectures, display servers, WebKitGTK minimum and update policy, accessibility targets, privacy defaults, and explicitly unsupported features. Publish a versioned support matrix and release criteria. Depends: none.
   *Status:* Policy revision 1 is published in [Release and support contract](docs/support.md).
 - [ ] **PRD-02 — Threat model.** Map untrusted pages, extensions if supported, internal pages, native processes, profiles and filesystem; document trust boundaries, attackers, security assumptions, abuse cases and residual risk. Have it independently reviewed. Depends: PRD-01.
-  *Status:* Not started.
+  *Status:* [Scope revision 1](docs/threat-model.md) records boundaries, threats and verification. Independent review remains open.
 - [ ] **PRD-03 — Inventory and ownership.** Audit each workspace crate, dependency, runtime, data store and UI entry point; identify owner/maintainer and choose implement, defer or remove for every placeholder. Ensure claims in README and settings match actual capabilities. Depends: PRD-01.
   *Status:* Partial. The README and settings now describe only working features (#15); `bitter-net` and `bitter-devtools` are still scaffolds and `bitter-cli` has only a partial command-line contract, without a decision for each.
 - [ ] **PRD-04 — Quality gates.** Define measurable security, functional, compatibility, accessibility, performance, recovery and support gates; include test environments, evidence, sign-off owner and explicit release blocker policy. No gate may be satisfied solely by a coverage percentage. Depends: PRD-01, PRD-02.
