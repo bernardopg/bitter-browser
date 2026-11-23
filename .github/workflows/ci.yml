@@ -49,6 +49,12 @@ jobs:
           GDK_BACKEND: x11
           GSK_RENDERER: cairo
         run: scripts/headless-session.sh -- cargo test -p bitter-ui --locked settings_widgets_save_restore_and_report_errors -- --ignored
+      - name: Test native sidebar accessibility
+        env:
+          GTK_A11Y: test
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+        run: scripts/headless-session.sh -- cargo test -p bitter-ui --locked tab_names_and_loading_state_follow_the_page
       - name: Smoke test browsing and session recovery
         run: |
           cargo build -p bitter-ui --locked

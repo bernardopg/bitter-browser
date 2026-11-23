@@ -172,6 +172,62 @@ mod tests {
     }
 
     #[test]
+    fn failed_schema_probe_rolls_back_migration_and_allows_retry() {
+        let profile = tempfile::tempdir().unwrap();
+        let path = profile.path().join("probe.sqlite");
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch("CREATE TABLE legacy (value TEXT); INSERT INTO legacy VALUES ('kept');")
+            .unwrap();
+        drop(conn);
+        let migration = "CREATE TABLE new_table (value TEXT);";
+        assert!(open(&path, migration, &["SELECT missing FROM new_table"]).is_err());
+        let conn = Connection::open(&path).unwrap();
+        let version: i64 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 0);
+        let tables: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE name = 'new_table'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(tables, 0);
+        let value: String = conn
+            .query_row("SELECT value FROM legacy", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(value, "kept");
+        drop(conn);
+        drop(open(&path, migration, &["SELECT value FROM new_table"]).unwrap());
+        let conn = Connection::open(&path).unwrap();
+        let version: i64 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn locked_database_fails_without_migration_then_succeeds_after_unlock() {
+        let profile = tempfile::tempdir().unwrap();
+        let path = profile.path().join("locked.sqlite");
+        let lock = Connection::open(&path).unwrap();
+        lock.execute_batch("CREATE TABLE legacy (value TEXT); INSERT INTO legacy VALUES ('kept'); BEGIN IMMEDIATE;").unwrap();
+        let mut contender = Connection::open(&path).unwrap();
+        contender.busy_timeout(std::time::Duration::ZERO).unwrap();
+        let migration = "CREATE TABLE new_table (value TEXT);";
+        assert!(
+            matches!(upgrade(&mut contender, migration, &[]), Err(SchemaError::Sqlite(error)) if error.sqlite_error_code() == Some(rusqlite::ErrorCode::DatabaseBusy))
+        );
+        lock.execute_batch("ROLLBACK;").unwrap();
+        upgrade(&mut contender, migration, &[]).unwrap();
+        let value: String = contender
+            .query_row("SELECT value FROM legacy", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(value, "kept");
+    }
+
+    #[test]
     fn open_rejects_read_only_database_files() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();

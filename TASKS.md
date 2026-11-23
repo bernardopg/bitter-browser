@@ -45,10 +45,10 @@ Details: [Profiles and local data](docs/profile.md),
   *Status:* Policy revision 1 is published in [Release and support contract](docs/support.md).
 - [ ] **PRD-02 — Threat model.** Map untrusted pages, extensions if supported, internal pages, native processes, profiles and filesystem; document trust boundaries, attackers, security assumptions, abuse cases and residual risk. Have it independently reviewed. Depends: PRD-01.
   *Status:* [Scope revision 1](docs/threat-model.md) records boundaries, threats and verification. Independent review remains open.
-- [ ] **PRD-03 — Inventory and ownership.** Audit each workspace crate, dependency, runtime, data store and UI entry point; identify owner/maintainer and choose implement, defer or remove for every placeholder. Ensure claims in README and settings match actual capabilities. Depends: PRD-01.
-  *Status:* Partial. The README and settings now describe only working features (#15); `bitter-net` and `bitter-devtools` are still scaffolds and `bitter-cli` has only a partial command-line contract, without a decision for each.
+- [x] **PRD-03 — Inventory and ownership.** Audit each workspace crate, dependency, runtime, data store and UI entry point; identify owner/maintainer and choose implement, defer or remove for every placeholder. Ensure claims in README and settings match actual capabilities. Depends: PRD-01.
+  *Status:* [Component inventory](docs/components.md) records maintainers, runtime and storage owners, entry points and decisions about deferred components.
 - [ ] **PRD-04 — Quality gates.** Define measurable security, functional, compatibility, accessibility, performance, recovery and support gates; include test environments, evidence, sign-off owner and explicit release blocker policy. No gate may be satisfied solely by a coverage percentage. Depends: PRD-01, PRD-02.
-  *Status:* Not started.
+  *Status:* The [production release gates](docs/release-gates.md) define evidence and release blocking criteria. Candidate execution and independent sign-off remain open.
 
 ## P0 — Browser security and privacy
 
@@ -92,7 +92,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [ ] **UI-01 — Navigation correctness.** Test address/search interpretation, back/forward/reload, redirects, page title/URL updates, loading errors and HTTP error pages; implement predictable focus, state and cancellation behavior. Depends: SEC-02.
   *Status:* Partial. Address and search interpretation, back, forward, reload, stop, redirects, error pages and focus are implemented and covered by unit and smoke tests (#8, #10). Missing: an explicit specification of focus and cancellation.
 - [ ] **UI-02 — Tabs, windows and workspaces.** Specify ownership and lifecycle; implement and test close-last-tab, reorder, background tabs, new window, popup, workspace switch and keyboard behavior without losing state. Depends: PRD-01.
-  *Status:* Partial. Workspaces, reorder, background tabs, close-last-tab, reopen and pop-ups as related tabs, with smoke tests (#8, #15). The browser has a single window.
+  *Status:* Partial. Workspaces, reorder, background tabs, close-last-tab, reopen and pop-ups as related tabs, with smoke tests (#8, #15). The browser has a single window. The smoke test covers closing the last tab, reopening it in place and preserving the other workspace.
 - [ ] **UI-03 — Downloads and uploads.** Implement explicit destination selection, overwrite and cancellation handling, progress, failure reporting and safe file-opening behavior; test Flatpak portal paths and untrusted filenames. Depends: SEC-02, DATA-01.
   *Status:* Partial. Destination choice, unique names, overwrite protection, progress, cancel, failure reporting, a persistent list and uploads (#10, #14). Missing: tests under the Flatpak file chooser portal.
 - [ ] **UI-04 — Bookmarks and history.** Complete CRUD, search, delete/clear, escaping and error states; prove persistence and timestamp/FTS behavior on real temporary SQLite databases. Depends: DATA-02, SEC-03.
@@ -100,14 +100,14 @@ Details: [Profiles and local data](docs/profile.md),
 - [x] **UI-05 — Settings and browser identity.** Replace the placeholder settings page with accessible controls tied to effective persisted behavior; show security state and errors accurately, including unavailable controls. Depends: DATA-03, SEC-06.
   *Status:* Preferences in four pages tied to effective behavior, with save errors, a site panel showing connection state, and a display test (#8, #15).
 - [ ] **UI-06 — Accessibility and localization.** Meet agreed keyboard-only, screen-reader, focus, high-contrast and scaling requirements; externalize strings and test at least the supported locales. Record manual and automated evidence. Depends: PRD-01.
-  *Status:* Not started beyond accessible labels on new controls. Strings are not externalized.
+  *Status:* The sidebar exposes named tab rows and close buttons and a busy state during loading. Screen-reader review, high contrast, scaling and localization remain open.
 - [ ] **UI-07 — Web compatibility.** Establish representative local fixtures and a maintained real-site compatibility matrix, including forms, media, downloads, authentication flows and common web APIs. Test privacy/security controls and document unsupported APIs without collecting real credentials. Depends: PRD-04.
   *Status:* Partial. YouTube playback and Media Source codecs were checked by hand (#15). No maintained matrix.
 
 ## P1 — Networking and optional product capabilities
 
-- [ ] **NET-01 — Network ownership.** Decide whether WebKit or `bitter-net` owns proxy, DNS, TLS and cookie behavior; implement only policies actually enforceable by the engine, document exceptions and test proxy/offline behavior. Depends: PRD-03, SEC-04.
-  *Status:* Not started. WebKit owns networking; `bitter-net` is a scaffold.
+- [ ] **NET-01 — Network ownership.** Define WebKit ownership of proxy, DNS, TLS and cookie behavior; implement only policies actually enforceable by the engine, document exceptions and test proxy/offline behavior. Depends: PRD-03, SEC-04.
+  *Status:* WebKit owns networking and uses platform proxy and resolver defaults. The unused scaffolds were removed. Proxy behavior on supported packages remains unverified.
 - [ ] **NET-02 — Content blocking lifecycle.** If included in v1, integrate `bitter-adblock` with requests, define filter provenance, refresh, integrity, failure and resource limits; test rules and allowlists. Otherwise defer transparently and remove false UI claims. Depends: SEC-06.
   *Status:* Partial. `bitter-adblock` converts lists, the browser downloads them over HTTPS in an ephemeral session, validates the format, rejects lists over the 8 MiB size limit, keeps the previous lists on failure, caps rules at 150,000 and refreshes every four days, with a per-site exception (#15). Missing: automated tests of network blocking and the per-site exception.
 - [x] **DEV-01 — Developer tools.** Decide whether to expose WebKit inspector or implement additional tools; gate access appropriately and test opening, closing and production defaults. Remove placeholder claims. Depends: PRD-03.
