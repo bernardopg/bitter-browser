@@ -354,7 +354,7 @@ class Browser:
             self.xdotool(*values)
 
     def enter(self, uri):
-        self.key("ctrl+l")
+        self.key("ctrl+l", "ctrl+a")
         self.xdotool("type", "--clearmodifiers", "--delay", "0", uri)
         self.key("Return")
 
