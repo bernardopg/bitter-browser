@@ -608,11 +608,92 @@ impl Row {
 
 #[cfg(test)]
 mod tests {
-    use super::download_directory;
+    use super::*;
+    use bitter_core::config::ConfigStore;
+
+    static GTK_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
     fn download_directory_is_absolute() {
         let directory = download_directory();
         assert!(directory.is_absolute(), "{}", directory.display());
+    }
+
+    #[gtk4::test]
+    fn restores_outcomes_and_clears_only_finished_rows() {
+        let _guard = GTK_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        adw::init().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let list_path = dir.path().join("downloads.json");
+        let existing = dir.path().join("existing.txt");
+        std::fs::write(&existing, b"hello").unwrap();
+        let (mut history, error) = DownloadList::open(list_path.clone());
+        assert!(error.is_none());
+        for (path, outcome) in [
+            (existing.clone(), DownloadOutcome::Completed),
+            (dir.path().join("deleted.txt"), DownloadOutcome::Completed),
+            (dir.path().join("failed.txt"), DownloadOutcome::Failed),
+            (dir.path().join("cancelled.txt"), DownloadOutcome::Cancelled),
+        ] {
+            history
+                .push(DownloadRecord {
+                    path,
+                    source: "https://example.test/file".into(),
+                    size: 5,
+                    finished: i64::MAX,
+                    outcome,
+                })
+                .unwrap();
+        }
+        let preferences = Rc::new(RefCell::new(ConfigStore::open(
+            dir.path().join("config.toml"),
+        )));
+        let downloads = Downloads::new(&adw::ToastOverlay::new(), preferences, list_path.clone());
+        assert!(downloads.button.is_visible());
+        assert!(downloads.clear.is_sensitive());
+        let rows = downloads.rows.borrow();
+        assert_eq!(rows.len(), 4);
+        let completed = &rows[0];
+        assert_eq!(completed.name.label(), "existing.txt");
+        assert_eq!(
+            completed.source.borrow().as_str(),
+            "https://example.test/file"
+        );
+        assert!(completed.openable());
+        assert!(completed.folder.property::<bool>("visible"));
+        assert_eq!(
+            completed.row.tooltip_text().as_deref(),
+            Some(format!("Open {}", existing.display()).as_str())
+        );
+        assert!(rows[1].status.label().starts_with("Deleted"));
+        assert!(!rows[1].openable());
+        for (row, status) in [(&rows[2], "Failed"), (&rows[3], "Cancelled")] {
+            assert!(row.status.label().starts_with(status));
+            assert!(row.row.has_css_class("download-failed"));
+            assert!(!row.openable());
+            assert!(!row.folder.property::<bool>("visible"));
+        }
+        for row in rows.iter() {
+            assert!(row.finished.get());
+            assert!(!row.progress.property::<bool>("visible"));
+            assert!(!row.cancel.property::<bool>("visible"));
+        }
+        drop(rows);
+
+        let active = downloads.add_row();
+        downloads.active.set(1);
+        downloads.refresh_button();
+        assert!(downloads.button.has_css_class("downloads-active"));
+        downloads.clear_finished();
+        assert_eq!(downloads.rows.borrow().len(), 1);
+        assert!(Rc::ptr_eq(&downloads.rows.borrow()[0], &active));
+        assert!(!downloads.clear.is_sensitive());
+        assert!(downloads.button.has_css_class("downloads-active"));
+        assert!(DownloadList::open(list_path).0.records().is_empty());
+        downloads.active.set(0);
+        downloads.refresh_button();
+        assert!(!downloads.button.has_css_class("downloads-active"));
     }
 }

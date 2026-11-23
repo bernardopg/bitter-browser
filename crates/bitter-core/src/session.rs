@@ -226,6 +226,45 @@ mod tests {
     }
 
     #[test]
+    fn load_sanitizes_untrusted_snapshot_and_clamps_both_workspaces() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("session.json");
+        let raw = r#"{"version":1,"session":{"workspace":"second","workspaces":[
+            {"tabs":[{"uri":"https://user:secret@example.test/","title":"Secret"},
+                     {"uri":"https://example.test/","title":"Safe\nTitle"}],"selected":99},
+            {"tabs":[],"selected":42}]}}"#;
+        std::fs::write(&path, raw).unwrap();
+
+        let session = load(&path).unwrap();
+        assert_eq!(session.workspace, WorkspaceId::Second);
+        assert_eq!(session.workspaces[0].selected, 1);
+        assert_eq!(session.workspaces[1].selected, 0);
+        assert_eq!(session.workspaces[0].tabs[0], SavedTab::new(HOME_URI, ""));
+        assert_eq!(session.workspaces[0].tabs[1].title, "SafeTitle");
+        assert_eq!(std::fs::read_to_string(path).unwrap(), raw);
+    }
+
+    #[test]
+    fn load_rejects_symlinks_and_fifos_without_reading_them() {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+        use std::os::unix::fs::symlink;
+
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target.json");
+        save(&target, Session::default()).unwrap();
+        let link = dir.path().join("link.json");
+        symlink(&target, &link).unwrap();
+        assert!(load(&link).is_err());
+        assert_eq!(load(&target).unwrap(), Session::default());
+
+        let fifo = dir.path().join("pipe");
+        let name = CString::new(fifo.as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+        assert_eq!(load(&fifo).unwrap_err().kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
     fn load_rejects_too_many_tabs_and_clamps_selection() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("session.json");

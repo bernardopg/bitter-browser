@@ -42,6 +42,13 @@ document.getElementById("file").addEventListener("change", async (event) => {
   fetch("/uploaded?" + encodeURIComponent([file.name, file.size, text.length].join("|")));
 });
 </script>"""
+FORM_PAGE = """<style>body{margin:10px;font:16px sans-serif}</style>
+<form method="post" action="/compat-submit">
+<label>Team <input name="team" required></label>
+<button type="submit">Submit</button>
+</form>"""
+
+
 PROBE_PAGE = """<style>body{margin:0;font:16px sans-serif}button{position:absolute;top:120px;left:10px}</style>
 <p>alpha beta alpha gamma alpha</p>
 <button onclick="document.documentElement.requestFullscreen()">Full screen</button>
@@ -77,6 +84,21 @@ setTimeout(() => window.close(), 1200);
 </script>"""
 
 
+BLOCKING_PAGE = """<script>
+function load(path) {
+  return new Promise(resolve => {
+    const image = new Image();
+    image.onload = () => resolve("loaded");
+    image.onerror = () => resolve("blocked");
+    image.src = path + "?load=" + Math.random();
+  });
+}
+Promise.all([load("/control-pixel.png"), load("/filter-probe.png")]).then(results => {
+  fetch("/event?" + encodeURIComponent("network-filter=" + location.hostname + ":" + results.join(",")));
+});
+</script>"""
+
+
 XLIB = ctypes.CDLL(ctypes.util.find_library("X11"))
 XTST = ctypes.CDLL(ctypes.util.find_library("Xtst"))
 XLIB.XOpenDisplay.restype = ctypes.c_void_p
@@ -90,6 +112,21 @@ F11 = 0xFFC8
 F9 = 0xFFC6
 F12 = 0xFFC9
 F5 = 0xFFC2
+
+
+def check_form_submission(browser, base):
+    form = f"{base}/compat-form"
+    browser.enter(form)
+    eventually(lambda: browser.matching_history(form, "Compat-Form"), "The form did not load")
+    requests = Fixture.count("/compat-submit")
+    browser.click(320, 81)
+    browser.xdotool("type", "--clearmodifiers", "--delay", "0", "Alex & team")
+    browser.key("Tab", "Return")
+    eventually(lambda: Fixture.count("/compat-submit") == requests + 1,
+               "WebKit did not submit the expected encoded form fields")
+    result = f"{base}/compat-confirmed"
+    eventually(lambda: browser.matching_history(result, "Compat-Confirmed"),
+               "The form confirmation did not load after the 303 redirect")
 
 
 def eventually(check, message, timeout=12):
@@ -152,10 +189,11 @@ class Fixture(BaseHTTPRequestHandler):
             self.send_header("Location", "/landing")
             self.end_headers()
             return
-        if self.path == "/favicon.ico":
+        if self.path.split("?", 1)[0] in ("/favicon.ico", "/control-pixel.png", "/filter-probe.png"):
             self.send_response(200)
             self.send_header("Content-Type", "image/png")
             self.send_header("Content-Length", str(len(FAVICON)))
+            self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(FAVICON)
             return
@@ -190,10 +228,14 @@ class Fixture(BaseHTTPRequestHandler):
             body = UPLOAD_PAGE
         elif self.path == "/probe":
             body = PROBE_PAGE
+        elif self.path == "/compat-form":
+            body = FORM_PAGE
         elif self.path == "/platform":
             body = PLATFORM_PAGE
         elif self.path == "/popup-child":
             body = POPUP_CHILD
+        elif self.path == "/blocking-probe":
+            body = BLOCKING_PAGE
         elif self.path == "/home":
             body = """<a href="/background" style="position:absolute; top:10px; left:10px">Open in background</a>
 <a href="/target" target="_blank" style="position:absolute; top:60px; left:10px">Open in a new tab</a>"""
@@ -208,6 +250,24 @@ class Fixture(BaseHTTPRequestHandler):
             self.wfile.write(f"<!doctype html><title>{name}</title>{body}".encode())
         except BrokenPipeError:
             pass
+
+    def do_POST(self):
+        length = self.headers.get("Content-Length", "")
+        if self.path != "/compat-submit" or not length.isdecimal() or len(length) > 4 or int(length) > 1024:
+            self.send_error(400)
+            return
+        if self.headers.get_content_type() != "application/x-www-form-urlencoded":
+            self.send_error(415)
+            return
+        payload = self.rfile.read(int(length)).decode("ascii", errors="replace")
+        if urllib.parse.parse_qs(payload) != {"team": ["Alex & team"]}:
+            self.send_error(400)
+            return
+        with self.lock:
+            self.paths[self.path] += 1
+        self.send_response(303)
+        self.send_header("Location", "/compat-confirmed")
+        self.end_headers()
 
     def log_message(self, *_args):
         pass
@@ -285,11 +345,13 @@ class Browser:
         self.focus_window(self.window)
         return elapsed
 
-    def dialog(self):
-        """The newest visible window of the browser other than the main one."""
+    def dialog(self, title=None):
+        """Find a visible dialog owned by the browser, optionally by exact title."""
         def find():
-            found = subprocess.run(["xdotool", "search", "--onlyvisible", "--pid", str(self.process.pid)],
-                                   text=True, capture_output=True).stdout.split()
+            command = ["xdotool", "search", "--onlyvisible", "--pid", str(self.process.pid)]
+            if title:
+                command += ["--all", "--name", f"^{re.escape(title)}$"]
+            found = subprocess.run(command, text=True, capture_output=True).stdout.split()
             others = [window for window in found if window != self.window]
             return others[-1] if others else None
         try:
@@ -339,7 +401,7 @@ class Browser:
             self.xdotool(*values)
 
     def enter(self, uri):
-        self.key("ctrl+l")
+        self.key("ctrl+l", "ctrl+a")
         self.xdotool("type", "--clearmodifiers", "--delay", "0", uri)
         self.key("Return")
 
@@ -373,8 +435,10 @@ class Browser:
                 if crash:
                     self.process.kill()
                 else:
-                    self.focus_window(self.window, required=False)
-                    self.key("ctrl+q")
+                    # Use the same application action as Ctrl+Q, even if
+                    # the inspector or a dialog currently has keyboard focus.
+                    subprocess.run(["gapplication", "action", "com.bitterbrowser.Browser", "quit"],
+                                   env=self.env, check=True, timeout=5)
                 code = self.process.wait(timeout=10)
                 assert crash or code == 0, f"Browser exited {code}\n{self.log.read_text()}"
             finally:
@@ -384,11 +448,36 @@ class Browser:
         self.process = None
 
 
+def edit_bookmark_title(browser, uri, original):
+    def saved_title():
+        try:
+            with sqlite3.connect(browser.profile / "bookmarks.sqlite", timeout=0.1) as db:
+                row = db.execute("SELECT title FROM bookmarks WHERE url = ?", (uri,)).fetchone()
+                return row[0] if row else None
+        except sqlite3.OperationalError:
+            return None
+
+    browser.key("ctrl+d")
+    eventually(lambda: saved_title() == original, "Bookmark was not saved")
+    browser.key("ctrl+shift+d")
+    time.sleep(0.3)
+    browser.key("ctrl+a")
+    browser.xdotool("type", "--clearmodifiers", "--delay", "0", "My saved title")
+    browser.key("Return")
+    eventually(lambda: saved_title() == "My saved title", "Edited bookmark title was not saved")
+    browser.key("ctrl+shift+d")
+    time.sleep(0.3)
+    browser.key("ctrl+a")
+    browser.xdotool("type", "--clearmodifiers", "--delay", "0", "Discard this draft")
+    browser.key("Escape")
+    assert saved_title() == "My saved title", "Cancelling the edit changed the bookmark"
+
+
 def tab_paths(session, workspace):
     return [tab["uri"] for tab in session["workspaces"][workspace]["tabs"]]
 
 
-def run_flow(browser, base):
+def run_flow(browser, base, launcher=None):
     def expect(path, count=1):
         return eventually(lambda: Fixture.count(path) >= count, f"No request for {path} ({count})")
 
@@ -415,6 +504,7 @@ def run_flow(browser, base):
     browser.enter(f"{base}/first")
     eventually(lambda: browser.matching_history(f"{base}/first", "First"), "First page was not ready")
     expect("/favicon.ico")
+    check_cancelled_address_draft(browser, f"{base}/first")
     browser.enter(f"{base}/redirect")
     expect("/landing")
     eventually(lambda: browser.matching_history(f"{base}/landing", "Landing"), "Redirected title was not saved")
@@ -478,8 +568,7 @@ def run_flow(browser, base):
     time.sleep(0.25)
     browser.key("Down", "Return")
     eventually(lambda: browser.current()["workspace"] == "second", "Switch-to-tab suggestion did not synchronize workspace")
-    browser.key("ctrl+d")
-    eventually(lambda: (browser.profile / "bookmarks.sqlite").exists(), "Bookmarks database missing")
+    edit_bookmark_title(browser, f"{base}/second", "Second")
     browser.key("ctrl+l")
     browser.xdotool("type", "--clearmodifiers", "--delay", "0", "Firs")
     time.sleep(0.35)
@@ -533,7 +622,13 @@ def run_flow(browser, base):
     selected_uri(f"{base}/background", index=3)
     time.sleep(0.25)
     browser.frame("restored")
-    handed_over = subprocess.run([browser.binary, f"{base}/external"], env=browser.env,
+    launch_env = browser.env.copy()
+    launch_env.pop("BITTER_BROWSER_BIN", None)
+    if launcher:
+        invalid = subprocess.run([launcher, "--unsupported-smoke-option"], env=launch_env,
+                                 capture_output=True, text=True, timeout=5)
+        assert invalid.returncode == 2 and "unknown option" in invalid.stderr, invalid
+    handed_over = subprocess.run([launcher or browser.binary, f"{base}/external"], env=launch_env,
                                  capture_output=True, text=True, timeout=20)
     assert handed_over.returncode == 0, handed_over.stderr
     expect("/external")
@@ -591,7 +686,8 @@ def run_flow(browser, base):
     step(lambda: browser.plain_key(F9), lambda r: r[1] > width + 150, "F9 did not hide the sidebar")
     step(lambda: browser.plain_key(F9), lambda r: r[1] == width, "F9 did not show the sidebar again")
     browser.stop()
-    return {"startup_ms": round(startup * 1000), "restore_ms": round(restart * 1000)}
+    return {"startup_ms": round(startup * 1000), "restore_ms": round(restart * 1000),
+            "cli_running_instance": bool(launcher)}
 
 
 def untrusted_certificate(browser, base, directory):
@@ -685,7 +781,7 @@ def dialogs_and_persistence(binary, directory, base, screenshots):
         browser.start()
         time.sleep(1)
         browser.enter(f"{base}/download")
-        browser.dialog()
+        browser.dialog("Save File")
         browser.key("ctrl+a")
         browser.xdotool("type", "--clearmodifiers", "--delay", "10", str(chosen))
         browser.key("Return")
@@ -710,6 +806,7 @@ def dialogs_and_persistence(binary, directory, base, screenshots):
         size = len(DOWNLOAD_BODY)
         eventually(lambda: f"picked name.txt|{size}|{size}" in Fixture.uploads,
                    f"The page did not receive the uploaded file: {Fixture.uploads}")
+        check_form_submission(browser, base)
 
         since = Fixture.mark()
         browser.enter(f"{base}/probe")
@@ -733,7 +830,18 @@ def dialogs_and_persistence(binary, directory, base, screenshots):
         browser.key("Escape")
     finally:
         browser.stop()
-    return {"uploaded": True, "restored_zoom_width": zoomed[1], "default_width": width}
+    return {"uploaded": True, "form_post_redirect": True, "restored_zoom_width": zoomed[1], "default_width": width}
+
+
+def check_cancelled_address_draft(browser, uri):
+    path = urllib.parse.urlsplit(uri).path
+    requests = Fixture.count(path)
+    browser.key("ctrl+l", "ctrl+a")
+    # Internal addresses never show the suggestions popover.
+    browser.xdotool("type", "--clearmodifiers", "--delay", "0", "bitter://history")
+    browser.key("Escape", "Return")
+    eventually(lambda: Fixture.count(path) == requests + 1,
+               "Escape did not restore the current address without suggestions")
 
 
 def web_platform(binary, directory, base, screenshots):
@@ -799,6 +907,43 @@ def web_platform(binary, directory, base, screenshots):
         event("notification", since, "granted", "The remembered answer was not given to the page")
         event("query", since, "granted", "navigator.permissions did not report the answer")
 
+        # Same host, different port. The origin boundary includes the port.
+        with ThreadingHTTPServer(("127.0.0.1", 0), Fixture) as other:
+            threading.Thread(target=other.serve_forever, daemon=True).start()
+            second_origin = f"http://127.0.0.1:{other.server_port}"
+            try:
+                since = Fixture.event_mark()
+                browser.enter(f"{second_origin}/platform")
+                event("notification", since, "default")
+                event("query", since, "prompt", "The first origin's grant leaked across ports")
+
+                browser.click(left + 40, top + 85)
+                time.sleep(0.8)
+                browser.frame("notification-denial")
+                browser.click(width - 125, top + 25)
+                event("requested", since, "denied", "Blocking notifications did not reach the page")
+                expected = [
+                    {"origin": base, "permission": "notifications", "allowed": True},
+                    {"origin": second_origin, "permission": "notifications", "allowed": False},
+                ]
+                eventually(
+                    lambda: sorted(json.loads(settings.read_text())["permissions"], key=lambda item: item["origin"])
+                    == sorted(expected, key=lambda item: item["origin"]),
+                    "The two origin decisions were not stored independently",
+                )
+
+                since = Fixture.event_mark()
+                browser.plain_key(F5)
+                event("notification", since, "denied", "The denial did not survive reload")
+                event("query", since, "denied")
+            finally:
+                other.shutdown()
+
+        since = Fixture.event_mark()
+        browser.enter(page)
+        event("notification", since, "granted", "Denying the second origin changed the first grant")
+        event("query", since, "granted")
+
         browser.xdotool("mousemove", "--window", browser.window, str(left + 50), str(top + 140))
         time.sleep(0.5)
         browser.frame("link-status")
@@ -855,7 +1000,83 @@ def web_platform(binary, directory, base, screenshots):
     finally:
         browser.stop()
     return {"popup_opener": True, "notification_remembered": True, "context_menu_tab": True,
+            "notification_denied": True, "notification_origin_isolation": True,
             "devtools": True, "element_hiding": True, "cleared_history_and_cookies": True}
+
+
+def network_blocking(binary, directory, base, screenshots):
+    """Use a cached list and two loopback hostnames to exercise WebKit filtering."""
+    browser = Browser(binary, directory, screenshots)
+    lists = browser.profile / "filter-lists"
+    lists.mkdir()
+    (lists / "easylist.txt").write_text("[Adblock Plus 2.0]\n/filter-probe.png$image\n")
+    settings = browser.profile / "site-settings.json"
+    page = f"{base}/blocking-probe"
+    other_page = f"{base.replace('127.0.0.1', 'localhost')}/blocking-probe"
+
+    def result(since, host, expected=None):
+        return eventually(
+            lambda: (value := Fixture.event("network-filter", since))
+            and value.startswith(f"{host}:") and (expected is None or value == f"{host}:{expected}") and value,
+            f"No matching filter result for {host}: {expected}",
+        )
+
+    def filter_requests():
+        with Fixture.lock:
+            return sum(count for path, count in Fixture.paths.items() if path.startswith("/filter-probe.png?"))
+
+    def switch_blocking(name, exceptions):
+        # The site panel opens under the address icon. Its first row is
+        # the blocking switch, before any stored permission decisions.
+        browser.click(406, 29)
+        time.sleep(0.25)
+        browser.frame(name)
+        browser.click(632, 165)
+        eventually(
+            lambda: settings.exists() and json.loads(settings.read_text())["unblocked"] == exceptions,
+            f"Site exception did not change to {exceptions}",
+        )
+        browser.key("Escape")
+
+    try:
+        browser.start()
+        since = Fixture.event_mark()
+        count = filter_requests()
+        browser.enter(page)
+        for _ in range(12):
+            if result(since, "127.0.0.1") == "127.0.0.1:loaded,blocked":
+                assert filter_requests() == count
+                break
+            time.sleep(0.25)
+            since = Fixture.event_mark()
+            count = filter_requests()
+            browser.plain_key(F5)
+        else:
+            raise AssertionError("The cached list did not block the test image")
+
+        since = Fixture.event_mark()
+        count = filter_requests()
+        switch_blocking("blocking-enabled", ["127.0.0.1"])
+        result(since, "127.0.0.1", "loaded,loaded")
+        assert filter_requests() == count + 1
+
+        since = Fixture.event_mark()
+        count = filter_requests()
+        browser.enter(other_page)
+        result(since, "localhost", "loaded,blocked")
+        assert filter_requests() == count, "The exception leaked to a different host"
+
+        since = Fixture.event_mark()
+        browser.enter(page)
+        result(since, "127.0.0.1", "loaded,loaded")
+        since = Fixture.event_mark()
+        count = filter_requests()
+        switch_blocking("blocking-exception", [])
+        result(since, "127.0.0.1", "loaded,blocked")
+        assert filter_requests() == count
+    finally:
+        browser.stop()
+    return {"network_filter": True, "site_blocking_exception": True, "site_exception_revoked": True}
 
 
 def window_geometry(binary, directory):
@@ -944,9 +1165,13 @@ def benchmark(binary, directory, base, samples):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=lambda value: str(Path(value).resolve()))
+    parser.add_argument("--launcher", type=Path, help="also test handoff through an installed bitter-cli")
     parser.add_argument("--screenshots", type=Path)
     parser.add_argument("--benchmark-samples", type=int, default=0)
     args = parser.parse_args()
+    launcher = args.launcher.resolve() if args.launcher else None
+    if launcher and (not launcher.is_file() or not os.access(launcher, os.X_OK)):
+        parser.error("--launcher must be an executable file")
     if args.screenshots:
         args.screenshots.mkdir(parents=True, exist_ok=True)
     if not shutil.which("xdotool"):
@@ -954,6 +1179,9 @@ def main():
     if not shutil.which("openssl"):
         parser.error("openssl is required")
     assert os.environ.get("DISPLAY") and os.environ.get("DBUS_SESSION_BUS_ADDRESS"), "Use Xvfb and dbus-run-session"
+    if not shutil.which("gapplication"):
+        parser.error("gapplication is required")
+
     fixture = ThreadingHTTPServer(("127.0.0.1", 0), Fixture)
     threading.Thread(target=fixture.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{fixture.server_port}"
@@ -961,7 +1189,7 @@ def main():
         directory = Path(root)
         browser = Browser(args.binary, directory / "flow", args.screenshots)
         try:
-            print(json.dumps(run_flow(browser, base)), flush=True)
+            print(json.dumps(run_flow(browser, base, launcher)), flush=True)
             print(json.dumps(window_geometry(args.binary, directory / "geometry")), flush=True)
             tls_browser = Browser(args.binary, directory / "tls", args.screenshots)
             print(json.dumps(untrusted_certificate(tls_browser, base, directory)), flush=True)
@@ -969,6 +1197,8 @@ def main():
                                                      args.screenshots)), flush=True)
             print(json.dumps(web_platform(args.binary, directory / "platform", base,
                                           args.screenshots)), flush=True)
+            print(json.dumps(network_blocking(args.binary, directory / "blocking", base,
+                                              args.screenshots)), flush=True)
             if args.benchmark_samples:
                 print(json.dumps(benchmark(args.binary, directory, base, args.benchmark_samples), indent=2))
             assert "panicked" not in browser.log.read_text(), browser.log.read_text()

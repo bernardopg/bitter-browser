@@ -142,6 +142,13 @@ impl CommandPalette {
                 keywords: &["favorite", "save", "star"],
             },
             Command {
+                id: "edit_bookmark",
+                title: "Edit Bookmark Title",
+                icon: "document-edit-symbolic",
+                shortcut: "Ctrl+Shift+D",
+                keywords: &["rename", "favorite", "bookmark"],
+            },
+            Command {
                 id: "history",
                 title: "Open History",
                 icon: "document-open-recent-symbolic",
