@@ -177,6 +177,43 @@ mod tests {
     use super::*;
 
     #[test]
+    fn search_connection_rejects_writes_without_changing_history_or_index() {
+        let profile = tempfile::tempdir().unwrap();
+        let history = History::open(profile.path()).unwrap();
+        history
+            .add_visit("https://example.org/kept", Some("Original title"))
+            .unwrap();
+        drop(history);
+        let readonly = History::open_for_search(profile.path()).unwrap();
+        assert_eq!(
+            readonly
+                .add_visit("https://example.org/new", Some("New title"))
+                .unwrap_err()
+                .sqlite_error_code(),
+            Some(rusqlite::ErrorCode::ReadOnly)
+        );
+        assert_eq!(
+            readonly
+                .update_title("https://example.org/kept", "Changed")
+                .unwrap_err()
+                .sqlite_error_code(),
+            Some(rusqlite::ErrorCode::ReadOnly)
+        );
+        assert_eq!(
+            readonly.clear_since(None).unwrap_err().sqlite_error_code(),
+            Some(rusqlite::ErrorCode::ReadOnly)
+        );
+        drop(readonly);
+        let reopened = History::open(profile.path()).unwrap();
+        assert_eq!(
+            reopened.search("Original").unwrap(),
+            vec![("https://example.org/kept".into(), "Original title".into())]
+        );
+        assert!(reopened.search("Changed").unwrap().is_empty());
+        assert_eq!(reopened.recent(10).unwrap().len(), 1);
+    }
+
+    #[test]
     fn clearing_removes_recent_pages_and_their_search_entries() {
         let dir = tempfile::tempdir().unwrap();
         let history = History::open(dir.path()).unwrap();
