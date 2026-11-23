@@ -385,17 +385,6 @@ def tab_paths(session, workspace):
     return [tab["uri"] for tab in session["workspaces"][workspace]["tabs"]]
 
 
-def check_cancelled_address_draft(browser, uri):
-    path = urllib.parse.urlsplit(uri).path
-    requests = Fixture.count(path)
-    browser.key("ctrl+l", "ctrl+a")
-    # Internal addresses never show the suggestions popover.
-    browser.xdotool("type", "--clearmodifiers", "--delay", "0", "bitter://history")
-    browser.key("Escape", "Return")
-    eventually(lambda: Fixture.count(path) == requests + 1,
-               "Escape did not restore the current address without suggestions")
-
-
 def run_flow(browser, base):
     def expect(path, count=1):
         return eventually(lambda: Fixture.count(path) >= count, f"No request for {path} ({count})")
@@ -658,6 +647,17 @@ def dialogs_and_persistence(binary, directory, base, screenshots):
     finally:
         browser.stop()
     return {"uploaded": True, "restored_zoom_width": zoomed[1], "default_width": width}
+
+
+def check_cancelled_address_draft(browser, uri):
+    path = urllib.parse.urlsplit(uri).path
+    requests = Fixture.count(path)
+    browser.key("ctrl+l", "ctrl+a")
+    # Internal addresses never show the suggestions popover.
+    browser.xdotool("type", "--clearmodifiers", "--delay", "0", "bitter://history")
+    browser.key("Escape", "Return")
+    eventually(lambda: Fixture.count(path) == requests + 1,
+               "Escape did not restore the current address without suggestions")
 
 
 def web_platform(binary, directory, base, screenshots):
