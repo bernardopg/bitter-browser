@@ -796,8 +796,11 @@ def window_geometry(binary, directory):
 
 def check_last_tab_lifecycle(browser, uri):
     """Closing the last tab affects only its workspace and is reversible."""
-    before = browser.current()
-    assert before["workspace"] == "second" and tab_paths(before, 1) == [uri]
+    before = eventually(
+        lambda: (saved := browser.current()) and saved["workspace"] == "second"
+        and tab_paths(saved, 1) == [uri] and saved,
+        "The session did not save the second workspace's current page",
+    )
     main_tabs = tab_paths(before, 0)
     main_selected = before["workspaces"][0]["selected"]
 
