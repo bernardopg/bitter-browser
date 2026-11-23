@@ -86,9 +86,11 @@ impl BitterApp {
             };
             for file in files {
                 let uri = file.uri();
-                if let Err(error) = window.activate_action("win.open_uri", Some(&uri.to_variant()))
+                if window
+                    .activate_action("win.open_uri", Some(&uri.to_variant()))
+                    .is_err()
                 {
-                    tracing::warn!("Could not open {uri}: {error}");
+                    tracing::warn!("Could not dispatch an external address");
                 }
             }
         });

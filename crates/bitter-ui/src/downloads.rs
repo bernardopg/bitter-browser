@@ -299,7 +299,7 @@ impl Downloads {
                 let outcome = if cancelled {
                     DownloadOutcome::Cancelled
                 } else {
-                    tracing::warn!("Download failed: {error}");
+                    tracing::warn!("Download failed");
                     downloads.toast(&format!("Download failed: {}", row.name.label()), None);
                     DownloadOutcome::Failed
                 };
@@ -330,7 +330,7 @@ impl Downloads {
             downloads.remember(&row, download, DownloadOutcome::Completed);
             let path = row.path.borrow().clone();
             if let Some(path) = path {
-                tracing::info!("Download finished: {}", path.display());
+                tracing::info!("Download finished");
                 downloads.toast(&format!("Downloaded {}", row.name.label()), Some(path));
             }
         });
@@ -375,7 +375,7 @@ impl Downloads {
 
     fn start(&self, download: &Download, row: &Row, path: PathBuf, overwrite: bool) -> bool {
         let Some(destination) = path.to_str() else {
-            tracing::warn!("Download destinations must be UTF-8: {}", path.display());
+            tracing::warn!("Download destination is not valid UTF-8");
             return false;
         };
         self.reserved.borrow_mut().insert(path.clone());
@@ -461,7 +461,7 @@ impl Downloads {
             if let Err(error) = result
                 && !error.matches(gtk4::DialogError::Dismissed)
             {
-                tracing::warn!("Could not open the download: {error}");
+                tracing::warn!("Could not open the download");
             }
         };
         if containing_folder {

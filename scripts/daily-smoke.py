@@ -549,6 +549,12 @@ def run_flow(browser, base):
     downloaded("report_final.txt", "report_final (1).txt")
     browser.enter(f"{base}/archive.zip")
     downloaded("report_final.txt", "report_final (1).txt", "archive.zip")
+    eventually(lambda: browser.log.read_text().count("Download finished") >= 3,
+               "Download completion diagnostics were not emitted")
+    assert all(name not in browser.log.read_text()
+               for name in ("report_final.txt", "report_final (1).txt", "archive.zip")), (
+        "Download diagnostics included a saved filename"
+    )
     time.sleep(0.3)
     browser.frame("downloads")
     assert tab_paths(browser.current(), 0)[-1] == f"{base}/external", "A download replaced the page"
