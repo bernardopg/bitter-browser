@@ -74,6 +74,21 @@ setTimeout(() => window.close(), 1200);
 </script>"""
 
 
+BLOCKING_PAGE = """<script>
+function load(path) {
+  return new Promise(resolve => {
+    const image = new Image();
+    image.onload = () => resolve("loaded");
+    image.onerror = () => resolve("blocked");
+    image.src = path + "?load=" + Math.random();
+  });
+}
+Promise.all([load("/control-pixel.png"), load("/filter-probe.png")]).then(results => {
+  fetch("/event?" + encodeURIComponent("network-filter=" + location.hostname + ":" + results.join(",")));
+});
+</script>"""
+
+
 XLIB = ctypes.CDLL(ctypes.util.find_library("X11"))
 XTST = ctypes.CDLL(ctypes.util.find_library("Xtst"))
 XLIB.XOpenDisplay.restype = ctypes.c_void_p
@@ -149,10 +164,11 @@ class Fixture(BaseHTTPRequestHandler):
             self.send_header("Location", "/landing")
             self.end_headers()
             return
-        if self.path == "/favicon.ico":
+        if self.path.split("?", 1)[0] in ("/favicon.ico", "/control-pixel.png", "/filter-probe.png"):
             self.send_response(200)
             self.send_header("Content-Type", "image/png")
             self.send_header("Content-Length", str(len(FAVICON)))
+            self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(FAVICON)
             return
@@ -191,6 +207,8 @@ class Fixture(BaseHTTPRequestHandler):
             body = PLATFORM_PAGE
         elif self.path == "/popup-child":
             body = POPUP_CHILD
+        elif self.path == "/blocking-probe":
+            body = BLOCKING_PAGE
         elif self.path == "/home":
             body = """<a href="/background" style="position:absolute; top:10px; left:10px">Open in background</a>
 <a href="/target" target="_blank" style="position:absolute; top:60px; left:10px">Open in a new tab</a>"""
@@ -770,6 +788,81 @@ def web_platform(binary, directory, base, screenshots):
             "devtools": True, "element_hiding": True, "cleared_history_and_cookies": True}
 
 
+def network_blocking(binary, directory, base, screenshots):
+    """Use a cached list and two loopback hostnames to exercise WebKit filtering."""
+    browser = Browser(binary, directory, screenshots)
+    lists = browser.profile / "filter-lists"
+    lists.mkdir()
+    (lists / "easylist.txt").write_text("[Adblock Plus 2.0]\n/filter-probe.png$image\n")
+    settings = browser.profile / "site-settings.json"
+    page = f"{base}/blocking-probe"
+    other_page = f"{base.replace('127.0.0.1', 'localhost')}/blocking-probe"
+
+    def result(since, host, expected=None):
+        return eventually(
+            lambda: (value := Fixture.event("network-filter", since))
+            and value.startswith(f"{host}:") and (expected is None or value == f"{host}:{expected}") and value,
+            f"No matching filter result for {host}: {expected}",
+        )
+
+    def filter_requests():
+        with Fixture.lock:
+            return sum(count for path, count in Fixture.paths.items() if path.startswith("/filter-probe.png?"))
+
+    def switch_blocking(name, exceptions):
+        # The site panel opens under the address icon. Its first row is
+        # the blocking switch, before any stored permission decisions.
+        browser.click(406, 29)
+        time.sleep(0.25)
+        browser.frame(name)
+        browser.click(632, 165)
+        eventually(
+            lambda: settings.exists() and json.loads(settings.read_text())["unblocked"] == exceptions,
+            f"Site exception did not change to {exceptions}",
+        )
+        browser.key("Escape")
+
+    try:
+        browser.start()
+        since = Fixture.event_mark()
+        count = filter_requests()
+        browser.enter(page)
+        for _ in range(12):
+            if result(since, "127.0.0.1") == "127.0.0.1:loaded,blocked":
+                assert filter_requests() == count
+                break
+            time.sleep(0.25)
+            since = Fixture.event_mark()
+            count = filter_requests()
+            browser.plain_key(F5)
+        else:
+            raise AssertionError("The cached list did not block the test image")
+
+        since = Fixture.event_mark()
+        count = filter_requests()
+        switch_blocking("blocking-enabled", ["127.0.0.1"])
+        result(since, "127.0.0.1", "loaded,loaded")
+        assert filter_requests() == count + 1
+
+        since = Fixture.event_mark()
+        count = filter_requests()
+        browser.enter(other_page)
+        result(since, "localhost", "loaded,blocked")
+        assert filter_requests() == count, "The exception leaked to a different host"
+
+        since = Fixture.event_mark()
+        browser.enter(page)
+        result(since, "127.0.0.1", "loaded,loaded")
+        since = Fixture.event_mark()
+        count = filter_requests()
+        switch_blocking("blocking-exception", [])
+        result(since, "127.0.0.1", "loaded,blocked")
+        assert filter_requests() == count
+    finally:
+        browser.stop()
+    return {"network_filter": True, "site_blocking_exception": True, "site_exception_revoked": True}
+
+
 def window_geometry(binary, directory):
     browser = Browser(binary, directory, None)
     keyfile = directory / "config" / "glib-2.0" / "settings" / "keyfile"
@@ -845,6 +938,8 @@ def main():
                                                      args.screenshots)), flush=True)
             print(json.dumps(web_platform(args.binary, directory / "platform", base,
                                           args.screenshots)), flush=True)
+            print(json.dumps(network_blocking(args.binary, directory / "blocking", base,
+                                              args.screenshots)), flush=True)
             if args.benchmark_samples:
                 print(json.dumps(benchmark(args.binary, directory, base, args.benchmark_samples), indent=2))
             assert "panicked" not in browser.log.read_text(), browser.log.read_text()
