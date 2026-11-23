@@ -102,7 +102,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [ ] **UI-06 — Accessibility and localization.** Meet agreed keyboard-only, screen-reader, focus, high-contrast and scaling requirements; externalize strings and test at least the supported locales. Record manual and automated evidence. Depends: PRD-01.
   *Status:* The sidebar exposes named tab rows and close buttons and a busy state during loading. Screen-reader review, high contrast, scaling and localization remain open.
 - [ ] **UI-07 — Web compatibility.** Establish representative local fixtures and a maintained real-site compatibility matrix, including forms, media, downloads, authentication flows and common web APIs. Test privacy/security controls and document unsupported APIs without collecting real credentials. Depends: PRD-04.
-  *Status:* Partial. YouTube playback and Media Source codecs were checked by hand (#15). No maintained matrix.
+  *Status:* Partial. YouTube playback and Media Source codecs were checked by hand (#15). The [compatibility matrix](docs/web-compatibility.md) records local evidence and manual scenarios. The smoke test exercises form submission and a 303 redirect.
 
 ## P1 — Networking and optional product capabilities
 

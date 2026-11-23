@@ -42,6 +42,13 @@ document.getElementById("file").addEventListener("change", async (event) => {
   fetch("/uploaded?" + encodeURIComponent([file.name, file.size, text.length].join("|")));
 });
 </script>"""
+FORM_PAGE = """<style>body{margin:10px;font:16px sans-serif}</style>
+<form method="post" action="/compat-submit">
+<label>Team <input name="team" required></label>
+<button type="submit">Submit</button>
+</form>"""
+
+
 PROBE_PAGE = """<style>body{margin:0;font:16px sans-serif}button{position:absolute;top:120px;left:10px}</style>
 <p>alpha beta alpha gamma alpha</p>
 <button onclick="document.documentElement.requestFullscreen()">Full screen</button>
@@ -105,6 +112,21 @@ F11 = 0xFFC8
 F9 = 0xFFC6
 F12 = 0xFFC9
 F5 = 0xFFC2
+
+
+def check_form_submission(browser, base):
+    form = f"{base}/compat-form"
+    browser.enter(form)
+    eventually(lambda: browser.matching_history(form, "Compat-Form"), "The form did not load")
+    requests = Fixture.count("/compat-submit")
+    browser.click(320, 81)
+    browser.xdotool("type", "--clearmodifiers", "--delay", "0", "Alex & team")
+    browser.key("Tab", "Return")
+    eventually(lambda: Fixture.count("/compat-submit") == requests + 1,
+               "WebKit did not submit the expected encoded form fields")
+    result = f"{base}/compat-confirmed"
+    eventually(lambda: browser.matching_history(result, "Compat-Confirmed"),
+               "The form confirmation did not load after the 303 redirect")
 
 
 def eventually(check, message, timeout=12):
@@ -206,6 +228,8 @@ class Fixture(BaseHTTPRequestHandler):
             body = UPLOAD_PAGE
         elif self.path == "/probe":
             body = PROBE_PAGE
+        elif self.path == "/compat-form":
+            body = FORM_PAGE
         elif self.path == "/platform":
             body = PLATFORM_PAGE
         elif self.path == "/popup-child":
@@ -226,6 +250,24 @@ class Fixture(BaseHTTPRequestHandler):
             self.wfile.write(f"<!doctype html><title>{name}</title>{body}".encode())
         except BrokenPipeError:
             pass
+
+    def do_POST(self):
+        length = self.headers.get("Content-Length", "")
+        if self.path != "/compat-submit" or not length.isdecimal() or len(length) > 4 or int(length) > 1024:
+            self.send_error(400)
+            return
+        if self.headers.get_content_type() != "application/x-www-form-urlencoded":
+            self.send_error(415)
+            return
+        payload = self.rfile.read(int(length)).decode("ascii", errors="replace")
+        if urllib.parse.parse_qs(payload) != {"team": ["Alex & team"]}:
+            self.send_error(400)
+            return
+        with self.lock:
+            self.paths[self.path] += 1
+        self.send_response(303)
+        self.send_header("Location", "/compat-confirmed")
+        self.end_headers()
 
     def log_message(self, *_args):
         pass
@@ -393,8 +435,10 @@ class Browser:
                 if crash:
                     self.process.kill()
                 else:
-                    self.focus_window(self.window, required=False)
-                    self.key("ctrl+q")
+                    # Use the same application action as Ctrl+Q, even if
+                    # the inspector or a dialog currently has keyboard focus.
+                    subprocess.run(["gapplication", "action", "com.bitterbrowser.Browser", "quit"],
+                                   env=self.env, check=True, timeout=5)
                 code = self.process.wait(timeout=10)
                 assert crash or code == 0, f"Browser exited {code}\n{self.log.read_text()}"
             finally:
@@ -756,6 +800,7 @@ def dialogs_and_persistence(binary, directory, base, screenshots):
         size = len(DOWNLOAD_BODY)
         eventually(lambda: f"picked name.txt|{size}|{size}" in Fixture.uploads,
                    f"The page did not receive the uploaded file: {Fixture.uploads}")
+        check_form_submission(browser, base)
 
         since = Fixture.mark()
         browser.enter(f"{base}/probe")
@@ -779,7 +824,7 @@ def dialogs_and_persistence(binary, directory, base, screenshots):
         browser.key("Escape")
     finally:
         browser.stop()
-    return {"uploaded": True, "restored_zoom_width": zoomed[1], "default_width": width}
+    return {"uploaded": True, "form_post_redirect": True, "restored_zoom_width": zoomed[1], "default_width": width}
 
 
 def check_cancelled_address_draft(browser, uri):
@@ -1128,6 +1173,9 @@ def main():
     if not shutil.which("openssl"):
         parser.error("openssl is required")
     assert os.environ.get("DISPLAY") and os.environ.get("DBUS_SESSION_BUS_ADDRESS"), "Use Xvfb and dbus-run-session"
+    if not shutil.which("gapplication"):
+        parser.error("gapplication is required")
+
     fixture = ThreadingHTTPServer(("127.0.0.1", 0), Fixture)
     threading.Thread(target=fixture.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{fixture.server_port}"
