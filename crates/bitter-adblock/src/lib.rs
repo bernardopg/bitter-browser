@@ -944,6 +944,19 @@ mod tests {
     }
 
     #[test]
+    fn invalid_cosmetic_domain_does_not_become_a_global_rule() {
+        let conversion = convert(
+            "good.test,~.broken.test##.important\n##.banner\n",
+            Scope::Full,
+        );
+        let rules: Vec<Value> = serde_json::from_str(&conversion.json).unwrap();
+
+        assert_eq!(conversion.skipped, 1);
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0]["action"]["selector"], ".banner");
+    }
+
+    #[test]
     fn cosmetic_batches_deduplicate_and_keep_domain_scopes_separate() {
         let mut list = String::new();
         for index in 0..=SELECTORS_PER_RULE {
