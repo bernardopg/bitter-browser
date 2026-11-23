@@ -21,6 +21,12 @@ production telemetry program.
 - Logs are intended for operational/debug diagnostics, not as a data collection
   channel.
 
+Download completion, destination validation, failure and launch diagnostics
+emit fixed event messages. External address dispatch failures also use a fixed
+message. The download UI still identifies the file and shows WebKit failure
+details to the user. The loopback smoke test checks that completed filenames
+are absent from the browser log.
+
 ## Sensitive data handling expectations
 
 - Do not log credentials, passwords, form data, cookies, session tokens, or
