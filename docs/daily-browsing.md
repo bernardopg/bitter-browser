@@ -131,7 +131,7 @@ xdg-settings set default-web-browser com.bitterbrowser.Browser.desktop
 and passes every other argument to `bitter-ui` (everything after `--` is
 passed unchanged). It runs the `bitter-ui` next to it, or the program named
 by `BITTER_BROWSER_BIN`, and returns its exit code. Both use the same
-profile; there is no profile selection yet.
+default profile. The supported launcher contract uses one profile.
 
 Give full addresses with their scheme. A bare name such as `example.org` is
 treated as a file in the current directory, as with other GTK
@@ -146,9 +146,9 @@ settings.
 Run the local WebKit smoke test and optionally collect startup samples.
 
 ```sh
-cargo build -p bitter-ui --locked
+cargo build -p bitter-ui -p bitter-cli --locked
 scripts/headless-session.sh --screen 1440x1000x24 -- \
-  python3 scripts/daily-smoke.py target/debug/bitter-ui --benchmark-samples 5
+  python3 scripts/daily-smoke.py target/debug/bitter-ui --launcher target/debug/bitter-cli --benchmark-samples 5
 ```
 
 The harness uses disposable profiles and loopback only. It checks navigation,

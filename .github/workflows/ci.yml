@@ -51,8 +51,8 @@ jobs:
         run: scripts/headless-session.sh -- cargo test -p bitter-ui --locked settings_widgets_save_restore_and_report_errors -- --ignored
       - name: Smoke test browsing and session recovery
         run: |
-          cargo build -p bitter-ui --locked
-          scripts/headless-session.sh --screen 1440x1000x24 -- timeout 180s python3 scripts/daily-smoke.py target/debug/bitter-ui
+          cargo build -p bitter-ui -p bitter-cli --locked
+          scripts/headless-session.sh --screen 1440x1000x24 -- timeout 180s python3 scripts/daily-smoke.py target/debug/bitter-ui --launcher target/debug/bitter-cli
       - name: Upload coverage
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
