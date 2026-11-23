@@ -42,14 +42,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bitter-devtools"
-version = "0.4.0"
-
-[[package]]
-name = "bitter-net"
-version = "0.4.0"
-
-[[package]]
 name = "bitter-ui"
 version = "0.4.0"
 dependencies = [

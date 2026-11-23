@@ -19,7 +19,11 @@
 | Show or hide the sidebar | F9 |
 | Preferences | Ctrl+, |
 
-Main and Second keep their own order and selected tab. Ctrl-click or
+Main and Second keep their own order and selected tab. Closing the last tab
+in the active workspace creates a fresh New Tab there. Ctrl+Shift+T reopens a
+closed page at its previous position and selects it in its original workspace.
+The other workspace keeps its tabs and selection.
+ Ctrl-click or
 middle-click on a web link makes a background tab. Clicking a link that
 requests a new window opens it in the current workspace. Windows a page opens
 with `window.open`, such as sign-in and payment pop-ups, open as the next tab
