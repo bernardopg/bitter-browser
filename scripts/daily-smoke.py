@@ -282,11 +282,13 @@ class Browser:
         self.focus_window(self.window)
         return elapsed
 
-    def dialog(self):
-        """The newest visible window of the browser other than the main one."""
+    def dialog(self, title=None):
+        """Find a visible dialog owned by the browser, optionally by exact title."""
         def find():
-            found = subprocess.run(["xdotool", "search", "--onlyvisible", "--pid", str(self.process.pid)],
-                                   text=True, capture_output=True).stdout.split()
+            command = ["xdotool", "search", "--onlyvisible", "--pid", str(self.process.pid)]
+            if title:
+                command += ["--all", "--name", f"^{re.escape(title)}$"]
+            found = subprocess.run(command, text=True, capture_output=True).stdout.split()
             others = [window for window in found if window != self.window]
             return others[-1] if others else None
         try:
@@ -597,7 +599,7 @@ def dialogs_and_persistence(binary, directory, base, screenshots):
         browser.start()
         time.sleep(1)
         browser.enter(f"{base}/download")
-        browser.dialog()
+        browser.dialog("Save File")
         browser.key("ctrl+a")
         browser.xdotool("type", "--clearmodifiers", "--delay", "10", str(chosen))
         browser.key("Return")
