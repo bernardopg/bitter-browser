@@ -21,7 +21,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install native dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libwebkitgtk-6.0-dev dbus xvfb xauth xdotool
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libwebkitgtk-6.0-dev dbus xvfb xauth xdotool openssl
       - name: Install Rust components
         run: rustup update stable && rustup default stable && rustup component add rustfmt clippy llvm-tools-preview
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
