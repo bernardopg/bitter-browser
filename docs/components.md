@@ -11,14 +11,15 @@ The [support contract](support.md) defines the release targets.
 | `bitter-ui` | Desktop application, address bar, tab/workspace sidebar, native preferences and dialogs, generated history/bookmarks pages, WebKit signals | Maintain. Verify UI changes against the real browser. |
 | `bitter-cli` | Installed launcher and argument handling. Delegates to the desktop application's profile and running instance | Maintain the single-profile launcher. Track its invocation contract in CLI-01. |
 | `bitter-adblock` | Converts supported filter-list rules for WebKit. Browser owns list download, cache and installation | Maintain the supported rule subset. NET-02 owns lifecycle and offline tests. |
-| `bitter-net` | Unused networking scaffold | Defer independent networking. WebKit owns browser networking. Remove the scaffold when NET-01 resolves workspace cleanup. |
-| `bitter-devtools` | Unused developer-tools scaffold | Defer a custom inspector. Keep using the optional WebKit Inspector. Remove the unused scaffold in a scoped cleanup. |
 
 ## Runtime and dependencies
 
 GTK 4 owns native widgets and file selection. Libadwaita supplies the window,
 dialogs and preferences. WebKitGTK owns page rendering, network transport, web
-storage and web-process isolation. Its runtime follows the package policy in the
+storage and web-process isolation. WebKit's network session uses the
+platform proxy and resolver defaults. Bitter Browser has no separate proxy or
+DNS setting. The browser applies cookie preferences and HTTPS-only navigation
+through WebKit. Web Inspector is the supported developer tool. Its runtime follows the package policy in the
 support contract. Meson installs the binaries, desktop registration, GSettings
 schema and icons. Flatpak and Arch packaging own the distribution boundary.
 
