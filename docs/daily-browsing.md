@@ -151,7 +151,8 @@ settings.
 
 ## Verification
 
-Run the local WebKit smoke test and optionally collect startup samples.
+Run the local WebKit smoke test and optionally collect startup samples. Install
+OpenSSL to generate the untrusted certificate fixture for the test.
 
 ```sh
 cargo build -p bitter-ui --locked
