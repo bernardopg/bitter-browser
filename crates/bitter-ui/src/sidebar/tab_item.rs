@@ -38,7 +38,6 @@ impl TabItem {
             .build();
 
         let label = gtk4::Label::builder()
-            .label(title)
             .ellipsize(gtk4::pango::EllipsizeMode::End)
             .xalign(0.0)
             .max_width_chars(20)
@@ -63,14 +62,16 @@ impl TabItem {
         box_container.append(&close_button);
         row.set_child(Some(&box_container));
 
-        Self {
+        let item = Self {
             row,
             id: id.to_string(),
             icon: favicon,
             spinner,
             close_button,
             label,
-        }
+        };
+        item.update(title, false);
+        item
     }
 
     pub fn row(&self) -> &gtk4::ListBoxRow {
@@ -78,10 +79,21 @@ impl TabItem {
     }
 
     pub fn update(&self, title: &str, loading: bool) {
+        let accessible_title = if title.trim().is_empty() {
+            "Untitled tab"
+        } else {
+            title
+        };
+        let close_label = format!("Close {accessible_title}");
         self.label.set_label(title);
-        self.row.set_tooltip_text(Some(title));
+        self.row.set_tooltip_text(Some(accessible_title));
+        self.row
+            .update_property(&[gtk4::accessible::Property::Label(accessible_title)]);
+        self.row
+            .update_state(&[gtk4::accessible::State::Busy(loading)]);
+        self.close_button.set_tooltip_text(Some(&close_label));
         self.close_button
-            .set_tooltip_text(Some(&format!("Close {title}")));
+            .update_property(&[gtk4::accessible::Property::Label(&close_label)]);
         self.icon.set_visible(!loading);
         self.spinner.set_visible(loading);
     }
@@ -98,6 +110,56 @@ impl TabItem {
         let id = self.id.clone();
         self.close_button.connect_clicked(move |_| {
             f(&id);
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tab_names_and_loading_state_follow_the_page() {
+        gtk4::test_synced(|| {
+            libadwaita::init().unwrap();
+            let item = TabItem::new("tab-id", "");
+            assert_eq!(item.row.tooltip_text().as_deref(), Some("Untitled tab"));
+            assert_eq!(
+                item.close_button.tooltip_text().as_deref(),
+                Some("Close Untitled tab")
+            );
+            // The workspace coverage job disables the accessibility backend.
+            // The native accessibility CI step runs these checks with GTK_A11Y=test.
+            let accessibility = std::env::var("GTK_A11Y").as_deref() != Ok("none");
+            if accessibility {
+                assert!(gtk4::test_accessible_has_property(
+                    &item.row,
+                    gtk4::AccessibleProperty::Label
+                ));
+                assert!(gtk4::test_accessible_has_property(
+                    &item.close_button,
+                    gtk4::AccessibleProperty::Label
+                ));
+            }
+
+            item.update("New title", true);
+            assert_eq!(
+                item.close_button.tooltip_text().as_deref(),
+                Some("Close New title")
+            );
+            if accessibility {
+                assert!(gtk4::test_accessible_has_state(
+                    &item.row,
+                    gtk4::AccessibleState::Busy
+                ));
+            }
+            assert!(item.spinner.is_visible());
+            assert!(!item.icon.is_visible());
+
+            item.update("Loaded title", false);
+            assert_eq!(item.row.tooltip_text().as_deref(), Some("Loaded title"));
+            assert!(!item.spinner.is_visible());
+            assert!(item.icon.is_visible());
         });
     }
 }
