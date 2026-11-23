@@ -7,6 +7,22 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-23
+
+### Added
+
+- Edit a saved bookmark title with Ctrl+Shift+D or the command palette.
+- Sidebar tabs and close buttons expose accessible names. Tab rows report
+  their loading state.
+- Published the support contract, threat model, release gates, and web
+  compatibility matrix.
+
+### Fixed
+
+- Escape restores the active tab's address when cancelling an address draft.
+- Download and external-address diagnostics omit filenames, destination paths,
+  and raw addresses from the affected log events.
+
 ### Changed
 
 - Display tests, the ignored preferences test and the smoke test run through
@@ -16,6 +32,12 @@ All notable changes to Bitter Browser are documented here. The format follows
   desktop let the test bus take over `/run/user/<uid>/doc`, which left the
   desktop's `xdg-document-portal` failed (Flatpak apps lost file access),
   and crashed `xdg-desktop-portal-hyprland` on every run.
+
+- WebKitGTK owns networking and Web Inspector. The two unused workspace
+  scaffolds were removed.
+- Expanded regression tests for session and download recovery, launcher
+  handoff, last-tab behavior, form submission, TLS rejection, notifications,
+  and site-specific content blocking.
 
 ## [0.4.0] - 2026-11-22
 
@@ -160,6 +182,7 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 - Meson installation of the executable and the application icon.
 
+[0.5.0]: https://github.com/bernardopg/bitter-browser/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/bernardopg/bitter-browser/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bernardopg/bitter-browser/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/bernardopg/bitter-browser/compare/v0.2.0...v0.2.1
