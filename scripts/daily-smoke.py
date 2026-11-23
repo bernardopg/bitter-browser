@@ -433,7 +433,7 @@ def tab_paths(session, workspace):
     return [tab["uri"] for tab in session["workspaces"][workspace]["tabs"]]
 
 
-def run_flow(browser, base):
+def run_flow(browser, base, launcher=None):
     def expect(path, count=1):
         return eventually(lambda: Fixture.count(path) >= count, f"No request for {path} ({count})")
 
@@ -577,7 +577,13 @@ def run_flow(browser, base):
     selected_uri(f"{base}/background", index=3)
     time.sleep(0.25)
     browser.frame("restored")
-    handed_over = subprocess.run([browser.binary, f"{base}/external"], env=browser.env,
+    launch_env = browser.env.copy()
+    launch_env.pop("BITTER_BROWSER_BIN", None)
+    if launcher:
+        invalid = subprocess.run([launcher, "--unsupported-smoke-option"], env=launch_env,
+                                 capture_output=True, text=True, timeout=5)
+        assert invalid.returncode == 2 and "unknown option" in invalid.stderr, invalid
+    handed_over = subprocess.run([launcher or browser.binary, f"{base}/external"], env=launch_env,
                                  capture_output=True, text=True, timeout=20)
     assert handed_over.returncode == 0, handed_over.stderr
     expect("/external")
@@ -629,7 +635,8 @@ def run_flow(browser, base):
     step(lambda: browser.plain_key(F9), lambda r: r[1] > width + 150, "F9 did not hide the sidebar")
     step(lambda: browser.plain_key(F9), lambda r: r[1] == width, "F9 did not show the sidebar again")
     browser.stop()
-    return {"startup_ms": round(startup * 1000), "restore_ms": round(restart * 1000)}
+    return {"startup_ms": round(startup * 1000), "restore_ms": round(restart * 1000),
+            "cli_running_instance": bool(launcher)}
 
 
 def untrusted_certificate(browser, base, directory):
@@ -1095,9 +1102,13 @@ def benchmark(binary, directory, base, samples):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=lambda value: str(Path(value).resolve()))
+    parser.add_argument("--launcher", type=Path, help="also test handoff through an installed bitter-cli")
     parser.add_argument("--screenshots", type=Path)
     parser.add_argument("--benchmark-samples", type=int, default=0)
     args = parser.parse_args()
+    launcher = args.launcher.resolve() if args.launcher else None
+    if launcher and (not launcher.is_file() or not os.access(launcher, os.X_OK)):
+        parser.error("--launcher must be an executable file")
     if args.screenshots:
         args.screenshots.mkdir(parents=True, exist_ok=True)
     if not shutil.which("xdotool"):
@@ -1112,7 +1123,7 @@ def main():
         directory = Path(root)
         browser = Browser(args.binary, directory / "flow", args.screenshots)
         try:
-            print(json.dumps(run_flow(browser, base)), flush=True)
+            print(json.dumps(run_flow(browser, base, launcher)), flush=True)
             print(json.dumps(window_geometry(args.binary, directory / "geometry")), flush=True)
             tls_browser = Browser(args.binary, directory / "tls", args.screenshots)
             print(json.dumps(untrusted_certificate(tls_browser, base, directory)), flush=True)
