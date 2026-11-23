@@ -412,8 +412,10 @@ class Browser:
                 if crash:
                     self.process.kill()
                 else:
-                    self.focus_window(self.window, required=False)
-                    self.key("ctrl+q")
+                    # Use the same application action as Ctrl+Q, even if
+                    # the inspector or a dialog currently has keyboard focus.
+                    subprocess.run(["gapplication", "action", "com.bitterbrowser.Browser", "quit"],
+                                   env=self.env, check=True, timeout=5)
                 code = self.process.wait(timeout=10)
                 assert crash or code == 0, f"Browser exited {code}\n{self.log.read_text()}"
             finally:
@@ -908,6 +910,9 @@ def main():
     if not shutil.which("xdotool"):
         parser.error("xdotool is required")
     assert os.environ.get("DISPLAY") and os.environ.get("DBUS_SESSION_BUS_ADDRESS"), "Use Xvfb and dbus-run-session"
+    if not shutil.which("gapplication"):
+        parser.error("gapplication is required")
+
     fixture = ThreadingHTTPServer(("127.0.0.1", 0), Fixture)
     threading.Thread(target=fixture.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{fixture.server_port}"
