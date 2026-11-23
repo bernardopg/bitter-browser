@@ -96,6 +96,21 @@ F12 = 0xFFC9
 F5 = 0xFFC2
 
 
+def check_form_submission(browser, base):
+    form = f"{base}/compat-form"
+    browser.enter(form)
+    eventually(lambda: browser.matching_history(form, "Compat-Form"), "The form did not load")
+    requests = Fixture.count("/compat-submit")
+    browser.click(320, 81)
+    browser.xdotool("type", "--clearmodifiers", "--delay", "0", "Alex & team")
+    browser.key("Tab", "Return")
+    eventually(lambda: Fixture.count("/compat-submit") == requests + 1,
+               "WebKit did not submit the expected encoded form fields")
+    result = f"{base}/compat-confirmed"
+    eventually(lambda: browser.matching_history(result, "Compat-Confirmed"),
+               "The form confirmation did not load after the 303 redirect")
+
+
 def eventually(check, message, timeout=12):
     until = time.monotonic() + timeout
     while time.monotonic() < until:
@@ -217,13 +232,13 @@ class Fixture(BaseHTTPRequestHandler):
 
     def do_POST(self):
         length = self.headers.get("Content-Length", "")
-        if self.path != "/compat-submit" or not length.isdecimal() or int(length) > 1024:
+        if self.path != "/compat-submit" or not length.isdecimal() or len(length) > 4 or int(length) > 1024:
             self.send_error(400)
             return
         if self.headers.get_content_type() != "application/x-www-form-urlencoded":
             self.send_error(415)
             return
-        payload = self.rfile.read(int(length)).decode("ascii")
+        payload = self.rfile.read(int(length)).decode("ascii", errors="replace")
         if urllib.parse.parse_qs(payload) != {"team": ["Alex & team"]}:
             self.send_error(400)
             return
@@ -609,21 +624,6 @@ def run_flow(browser, base):
     step(lambda: browser.plain_key(F9), lambda r: r[1] == width, "F9 did not show the sidebar again")
     browser.stop()
     return {"startup_ms": round(startup * 1000), "restore_ms": round(restart * 1000)}
-
-
-def check_form_submission(browser, base):
-    form = f"{base}/compat-form"
-    browser.enter(form)
-    eventually(lambda: browser.matching_history(form, "Compat-Form"), "The form did not load")
-    requests = Fixture.count("/compat-submit")
-    browser.click(320, 81)
-    browser.xdotool("type", "--clearmodifiers", "--delay", "0", "Alex & team")
-    browser.key("Tab", "Return")
-    eventually(lambda: Fixture.count("/compat-submit") == requests + 1,
-               "WebKit did not submit the expected encoded form fields")
-    result = f"{base}/compat-confirmed"
-    eventually(lambda: browser.matching_history(result, "Compat-Confirmed"),
-               "The form confirmation did not load after the 303 redirect")
 
 
 def dialogs_and_persistence(binary, directory, base, screenshots):
