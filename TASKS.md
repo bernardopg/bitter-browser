@@ -99,7 +99,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [x] **UI-05 — Settings and browser identity.** Replace the placeholder settings page with accessible controls tied to effective persisted behavior; show security state and errors accurately, including unavailable controls. Depends: DATA-03, SEC-06.
   *Status:* Preferences in four pages tied to effective behavior, with save errors, a site panel showing connection state, and a display test (#8, #15).
 - [ ] **UI-06 — Accessibility and localization.** Meet agreed keyboard-only, screen-reader, focus, high-contrast and scaling requirements; externalize strings and test at least the supported locales. Record manual and automated evidence. Depends: PRD-01.
-  *Status:* Not started beyond accessible labels on new controls. Strings are not externalized.
+  *Status:* The sidebar exposes named tab rows and close buttons and a busy state during loading. Screen-reader review, high contrast, scaling and localization remain open.
 - [ ] **UI-07 — Web compatibility.** Establish representative local fixtures and a maintained real-site compatibility matrix, including forms, media, downloads, authentication flows and common web APIs. Test privacy/security controls and document unsupported APIs without collecting real credentials. Depends: PRD-04.
   *Status:* Partial. YouTube playback and Media Source codecs were checked by hand (#15). No maintained matrix.
 
