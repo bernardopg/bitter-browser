@@ -77,7 +77,7 @@ a checksum file. All assets carry GitHub build provenance attestations.
 
 ```sh
 flatpak install --user flathub org.gnome.Platform//51
-flatpak install --user ./bitter-browser-0.4.0-x86_64.flatpak
+flatpak install --user ./bitter-browser-0.5.0-x86_64.flatpak
 flatpak run com.bitterbrowser.Browser
 ```
 
@@ -97,8 +97,8 @@ repository root, which builds `bitter-browser-git`.
 ### Verify a download
 
 ```sh
-sha256sum -c --ignore-missing bitter-browser-0.4.0-sha256.txt
-gh attestation verify bitter-browser-0.4.0-x86_64.flatpak --repo bernardopg/bitter-browser
+sha256sum -c --ignore-missing bitter-browser-0.5.0-sha256.txt
+gh attestation verify bitter-browser-0.5.0-x86_64.flatpak --repo bernardopg/bitter-browser
 ```
 
 ## Keyboard shortcuts

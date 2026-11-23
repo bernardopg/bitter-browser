@@ -23,8 +23,8 @@
       <li>Light, dark and system color schemes</li>
     </ul>
     <p>
-      The project is not yet production ready. Ad and tracker blocking and HTTPS-only mode
-      are not available.
+      The project is experimental. It includes ad and tracker blocking and an optional
+      HTTPS-only mode.
     </p>
   </description>
   <launchable type="desktop-id">com.bitterbrowser.Browser.desktop</launchable>
@@ -52,6 +52,17 @@
     <category>WebBrowser</category>
   </categories>
   <releases>
+    <release version="0.5.0" date="2026-11-23">
+      <url type="details">https://github.com/bernardopg/bitter-browser/releases/tag/v0.5.0</url>
+      <description>
+        <p>Bookmark title editing, more accessible tabs, and fixes for address editing and diagnostic privacy.</p>
+        <ul>
+          <li>Edit a saved bookmark title from the command palette or with Ctrl+Shift+D</li>
+          <li>Sidebar tabs expose accessible names and loading state</li>
+          <li>Escape restores the current address while editing the address bar</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-11-22">
       <url type="details">https://github.com/bernardopg/bitter-browser/releases/tag/v0.4.0</url>
       <description>
