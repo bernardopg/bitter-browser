@@ -942,4 +942,76 @@ mod tests {
         );
         assert!(mixed_rules[0]["trigger"].get("load-context").is_none());
     }
+
+    #[test]
+    fn invalid_cosmetic_domain_does_not_become_a_global_rule() {
+        let conversion = convert(
+            "good.test,~.broken.test##.important\n##.banner\n",
+            Scope::Full,
+        );
+        let rules: Vec<Value> = serde_json::from_str(&conversion.json).unwrap();
+
+        assert_eq!(conversion.skipped, 1);
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0]["action"]["selector"], ".banner");
+    }
+
+    #[test]
+    fn cosmetic_batches_deduplicate_and_keep_domain_scopes_separate() {
+        let mut list = String::new();
+        for index in 0..=SELECTORS_PER_RULE {
+            list.push_str(&format!("Example.TEST##.ad-{index:03}\n"));
+        }
+        list.push_str("example.test##.ad-000\n~shop.test##.ad-000\n");
+        let conversion = convert(&list, Scope::Full);
+        let rules: Vec<Value> = serde_json::from_str(&conversion.json).unwrap();
+        assert_eq!(conversion.skipped, 0);
+        assert_eq!(conversion.rules, 3);
+        let scoped: Vec<_> = rules
+            .iter()
+            .filter(|rule| rule["trigger"]["if-domain"] == json!(["*example.test"]))
+            .collect();
+        assert_eq!(scoped.len(), 2);
+        let selectors: Vec<_> = scoped
+            .iter()
+            .flat_map(|rule| rule["action"]["selector"].as_str().unwrap().split(", "))
+            .collect();
+        assert_eq!(selectors.len(), SELECTORS_PER_RULE + 1);
+        assert_eq!(
+            selectors
+                .iter()
+                .filter(|selector| **selector == ".ad-000")
+                .count(),
+            1
+        );
+        assert!(rules.iter().any(
+            |rule| rule["trigger"]["unless-domain"] == json!(["*shop.test"])
+                && rule["action"]["selector"] == ".ad-000"
+        ));
+    }
+
+    #[test]
+    fn rule_limit_counts_displaced_hiding_and_exceptions() {
+        let mut list = String::from("@@||allowed.test^\n##.ad\n");
+        for index in 0..MAX_RULES {
+            list.push_str(&format!("||block{index}.test^\n"));
+        }
+        let conversion = convert(&list, Scope::Full);
+        let rules: Vec<Value> = serde_json::from_str(&conversion.json).unwrap();
+        assert_eq!(conversion.rules, MAX_RULES);
+        assert_eq!(conversion.skipped, 2);
+        assert!(rules.iter().all(|rule| rule["action"]["type"] == "block"));
+    }
+
+    #[test]
+    fn literal_metacharacters_and_case_options_change_matching() {
+        let rules = rules("|https://example.test/a+b?c|\n||EXAMPLE.test/Path$match-case\n");
+        let literal = regex(rules[0]["trigger"]["url-filter"].as_str().unwrap());
+        assert!(literal.is_match("https://example.test/a+b?c"));
+        assert!(!literal.is_match("https://example.test/aaabc"));
+        let case = regex(rules[1]["trigger"]["url-filter"].as_str().unwrap());
+        assert!(case.is_match("https://EXAMPLE.test/Path"));
+        assert!(!case.is_match("https://example.test/path"));
+        assert_eq!(rules[1]["trigger"]["url-filter-is-case-sensitive"], true);
+    }
 }
