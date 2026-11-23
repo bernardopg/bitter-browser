@@ -48,7 +48,7 @@ Details: [Profiles and local data](docs/profile.md),
 - [x] **PRD-03 — Inventory and ownership.** Audit each workspace crate, dependency, runtime, data store and UI entry point; identify owner/maintainer and choose implement, defer or remove for every placeholder. Ensure claims in README and settings match actual capabilities. Depends: PRD-01.
   *Status:* [Component inventory](docs/components.md) records maintainers, runtime and storage owners, entry points and decisions for both scaffolds.
 - [ ] **PRD-04 — Quality gates.** Define measurable security, functional, compatibility, accessibility, performance, recovery and support gates; include test environments, evidence, sign-off owner and explicit release blocker policy. No gate may be satisfied solely by a coverage percentage. Depends: PRD-01, PRD-02.
-  *Status:* Not started.
+  *Status:* The [production release gates](docs/release-gates.md) define evidence and release blocking criteria. Candidate execution and independent sign-off remain open.
 
 ## P0 — Browser security and privacy
 
