@@ -151,6 +151,7 @@ under Xvfb; see [daily browsing](docs/daily-browsing.md#verification).
 | [Daily browsing](docs/daily-browsing.md) | Shortcuts, workspaces, suggestions, smoke test and startup baseline |
 | [Profiles and local data](docs/profile.md) | File locations, migrations, session restore and recovery |
 | [Architecture](docs/architecture.md) | Crate layout and current scope |
+| [Component inventory](docs/components.md) | Ownership, runtime dependencies, local state and entry points |
 | [Release and support contract](docs/support.md) | Target platforms, runtime policy, defaults and production criteria |
 | [CI and releases](docs/ci-release.md) | Checks, coverage, branch cleanup and the release process |
 | [Agent instructions](AGENTS.md) | Checks, tokensave, Headroom memory, branch cleanup and release check records |
