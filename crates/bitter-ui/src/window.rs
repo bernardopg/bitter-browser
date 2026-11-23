@@ -314,6 +314,7 @@ impl Browser {
             ("history", &["<Control>h"]),
             ("bookmarks", &["<Control>b"]),
             ("bookmark_page", &["<Control>d"]),
+            ("edit_bookmark", &["<Control><Shift>d"]),
             ("downloads", &["<Control>j"]),
             ("find", &["<Control>f"]),
             ("find_next", &["<Control>g"]),
@@ -505,6 +506,7 @@ impl Browser {
             "history" => self.navigate_active("bitter://history"),
             "bookmarks" => self.navigate_active("bitter://bookmarks"),
             "bookmark_page" => self.toggle_bookmark(),
+            "edit_bookmark" => self.edit_bookmark(),
             "settings" | "preferences" => self.show_preferences_page(preferences::GENERAL),
             "downloads" => self.downloads.show(),
             "find" => {
@@ -1386,6 +1388,72 @@ impl Browser {
                 self.toast("Could not change bookmark. Check disk space and profile permissions.");
             }
         }
+    }
+
+    fn edit_bookmark(self: &Rc<Self>) {
+        let (Some(tab), Some(window)) = (self.active(), self.window.upgrade()) else {
+            return;
+        };
+        if window.visible_dialog().is_some() {
+            return;
+        }
+        let uri = tab.uri();
+        let title = match self.bookmarks.title(&uri) {
+            Ok(Some(title)) => title,
+            Ok(None) => {
+                self.toast("Bookmark this page before editing its title.");
+                return;
+            }
+            Err(error) => {
+                tracing::warn!("Could not read bookmark: {error}");
+                self.toast("The saved bookmark could not be read.");
+                return;
+            }
+        };
+        let entry = gtk4::Entry::builder()
+            .text(&title)
+            .activates_default(true)
+            .build();
+        entry.update_property(&[gtk4::accessible::Property::Label("Bookmark title")]);
+        let alert = adw::AlertDialog::builder()
+            .heading("Edit Bookmark")
+            .extra_child(&entry)
+            .build();
+        alert.add_response("cancel", "Cancel");
+        alert.add_response("save", "Save");
+        alert.set_close_response("cancel");
+        alert.set_default_response(Some("save"));
+        alert.set_response_appearance("save", adw::ResponseAppearance::Suggested);
+        alert.set_response_enabled("save", !title.trim().is_empty());
+        let dialog = alert.downgrade();
+        entry.connect_changed(move |entry| {
+            if let Some(dialog) = dialog.upgrade() {
+                dialog.set_response_enabled("save", !entry.text().trim().is_empty());
+            }
+        });
+        alert.set_focus(Some(&entry));
+        let browser = Rc::downgrade(self);
+        alert.connect_response(Some("save"), move |_, _| {
+            let Some(browser) = browser.upgrade() else {
+                return;
+            };
+            let text = entry.text();
+            let title = text.trim();
+            if title.is_empty() {
+                return;
+            }
+            match browser.bookmarks.rename(&uri, title) {
+                Ok(true) => browser.toast("Bookmark updated"),
+                Ok(false) => browser.toast("This bookmark was removed."),
+                Err(error) => {
+                    tracing::warn!("Could not update bookmark: {error}");
+                    browser.toast(
+                        "Could not update bookmark. Check disk space and profile permissions.",
+                    );
+                }
+            }
+        });
+        alert.present(Some(&window));
     }
 
     fn record_history(&self, uri: &str, title: Option<&str>) {

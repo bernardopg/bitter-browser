@@ -381,6 +381,31 @@ class Browser:
         self.process = None
 
 
+def edit_bookmark_title(browser, uri, original):
+    def saved_title():
+        try:
+            with sqlite3.connect(browser.profile / "bookmarks.sqlite", timeout=0.1) as db:
+                row = db.execute("SELECT title FROM bookmarks WHERE url = ?", (uri,)).fetchone()
+                return row[0] if row else None
+        except sqlite3.OperationalError:
+            return None
+
+    browser.key("ctrl+d")
+    eventually(lambda: saved_title() == original, "Bookmark was not saved")
+    browser.key("ctrl+shift+d")
+    time.sleep(0.3)
+    browser.key("ctrl+a")
+    browser.xdotool("type", "--clearmodifiers", "--delay", "0", "My saved title")
+    browser.key("Return")
+    eventually(lambda: saved_title() == "My saved title", "Edited bookmark title was not saved")
+    browser.key("ctrl+shift+d")
+    time.sleep(0.3)
+    browser.key("ctrl+a")
+    browser.xdotool("type", "--clearmodifiers", "--delay", "0", "Discard this draft")
+    browser.key("Escape")
+    assert saved_title() == "My saved title", "Cancelling the edit changed the bookmark"
+
+
 def tab_paths(session, workspace):
     return [tab["uri"] for tab in session["workspaces"][workspace]["tabs"]]
 
@@ -474,8 +499,7 @@ def run_flow(browser, base):
     time.sleep(0.25)
     browser.key("Down", "Return")
     eventually(lambda: browser.current()["workspace"] == "second", "Switch-to-tab suggestion did not synchronize workspace")
-    browser.key("ctrl+d")
-    eventually(lambda: (browser.profile / "bookmarks.sqlite").exists(), "Bookmarks database missing")
+    edit_bookmark_title(browser, f"{base}/second", "Second")
     browser.key("ctrl+l")
     browser.xdotool("type", "--clearmodifiers", "--delay", "0", "Firs")
     time.sleep(0.35)

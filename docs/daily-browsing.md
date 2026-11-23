@@ -115,6 +115,13 @@ The Downloads button appears after the first download. It lists progress
 and lets you cancel, open the file or show it in its folder. Finished downloads
 stay listed after a restart until you clear them.
 
+## Editing bookmark titles
+
+Open a bookmarked page and press Ctrl+Shift+D, or choose **Edit Bookmark Title**
+from the command palette. Save changes the title shown in bookmarks and search
+while keeping the address and original sort order. Escape closes the dialog and
+discards the draft.
+
 ## Command line and default browser
 
 ```sh
