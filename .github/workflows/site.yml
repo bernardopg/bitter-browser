@@ -55,10 +55,10 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         run: |
           for _ in 1 2 3 4 5; do
-            curl -fsS https://browser.bebitterbebetter.com.br/ | grep -q 'The web, <em>unsweetened.</em>' && break
+            curl -fsS https://browser.bebitterbebetter.com.br/ | grep -q '<title>Bitter Browser — The web, unsweetened.</title>' && break
             sleep 10
           done
-          curl -fsS https://browser.bebitterbebetter.com.br/ | grep -q 'The web, <em>unsweetened.</em>'
+          curl -fsS https://browser.bebitterbebetter.com.br/ | grep -q '<title>Bitter Browser — The web, unsweetened.</title>'
           curl -fsS -o /dev/null https://browser.bebitterbebetter.com.br/brand/bitter-browser-brand-book.pdf
           location=$(curl -fsS -o /dev/null -w '%{redirect_url}' https://browser.bebitterbebetter.com.br/install.sh)
           test "$location" = "https://github.com/bernardopg/bitter-browser/releases/latest/download/install.sh"
