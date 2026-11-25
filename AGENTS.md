@@ -204,7 +204,9 @@ The full guide is [docs/distribution.md](docs/distribution.md).
   belongs to another product, so never reuse it.
 - Packaging lives in `packaging/` (`linux/`, `debian/`, `rpm/`, `arch/`,
   `arch-bin/`) and the root `PKGBUILD` (`-git`). The *Packages* workflow
-  builds and installs every format on pull requests that touch packaging;
+  builds and installs every format on every pull request that changes more
+  than documentation, the website or the brand book, and its *Packages
+  result* job is a required check;
   run the same scripts locally in Docker containers (examples in the guide).
 - A version bump also changes `packaging/arch-bin/PKGBUILD` and
   `packaging/rpm/bitter-browser.spec`; `scripts/check-version.py` checks them.
