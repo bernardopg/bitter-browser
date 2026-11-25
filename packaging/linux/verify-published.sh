@@ -15,7 +15,7 @@ case $method in
     deb) apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates ;;
     rpm) dnf install -y curl ;;
     pacman|pacman-repo) pacman -Syu --noconfirm --needed curl ;;
-    tarball) zypper --non-interactive install curl tar xz libwebkitgtk-6_0-4 libadwaita-1-0 glib2-tools ;;
+    tarball) zypper --non-interactive install curl tar xz findutils libwebkitgtk-6_0-4 libadwaita-1-0 glib2-tools ;;
 esac
 
 if [ "$method" = pacman-repo ]; then

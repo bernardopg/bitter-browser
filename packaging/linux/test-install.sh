@@ -14,7 +14,9 @@ prefix=/usr
 case $format in
     deb)
         export DEBIAN_FRONTEND=noninteractive
-        apt-get update
+        # Development images (Linux Mint) can list a retired repository; the
+        # distribution's own archives are enough for the dependencies.
+        apt-get update || echo "Some repositories could not be updated; continuing"
         apt-get install -y --no-install-recommends "$pkgs/bitter-browser_${version}-1_amd64.deb"
         update-alternatives --query x-www-browser | grep -Fx 'Value: /usr/bin/bitter-ui'
         ;;
@@ -28,7 +30,7 @@ case $format in
         pacman -U --noconfirm "$pkgs/pkg/bitter-browser-$version-1-x86_64.pkg.tar.zst"
         ;;
     tarball)
-        zypper --non-interactive install libwebkitgtk-6_0-4 libadwaita-1-0 tar xz util-linux glib2-tools
+        zypper --non-interactive install libwebkitgtk-6_0-4 libadwaita-1-0 tar xz findutils glib2-tools
         tar -xJf "$pkgs/bitter-browser-$version-linux-x86_64.tar.xz" -C /tmp
         "/tmp/bitter-browser-$version-linux-x86_64/install.sh"
         prefix=/usr/local

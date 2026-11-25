@@ -28,6 +28,11 @@ if [ -z "$prefix" ]; then
 fi
 manifest=$prefix/share/bitter-browser/installed-files
 
+for tool in find install sed sort ldd; do
+    command -v "$tool" >/dev/null 2>&1 ||
+        { echo "install.sh: '$tool' is required (coreutils, findutils, sed, glibc)" >&2; exit 1; }
+done
+
 refresh() {
     glib-compile-schemas "$prefix/share/glib-2.0/schemas" 2>/dev/null || true
     update-desktop-database -q "$prefix/share/applications" 2>/dev/null || true
