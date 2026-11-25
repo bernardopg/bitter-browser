@@ -2,18 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bitter Browser — The web, unsweetened.</title>
-<meta name="description" content="A native web browser for Linux. Ads and trackers blocked, tabs in a quiet sidebar, built in Rust on GTK 4 and WebKitGTK. Install on Arch, Debian, Ubuntu, Fedora or any Flatpak system.">
+<meta name="description" content="A native web browser for Linux. Ads and trackers blocked by default, tabs in a quiet sidebar with two workspaces, a command palette for everything. Built in Rust on GTK 4 and WebKitGTK.">
 <meta name="theme-color" content="#1c110d">
 <link rel="canonical" href="https://browser.bebitterbebetter.com.br/">
 <link rel="icon" href="/assets/icon/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/assets/icon/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="/assets/icon/apple-touch-icon.png">
+<link rel="preload" href="/fonts/fraunces-380.woff" as="font" type="font/woff" crossorigin>
 <link rel="stylesheet" href="/style.css">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Bitter Browser — The web, unsweetened.">
-<meta property="og:description" content="A native web browser for Linux. Ads and trackers blocked, tabs in a quiet sidebar.">
+<meta property="og:description" content="A native web browser for Linux. Ads and trackers blocked by default, tabs in a quiet sidebar.">
 <meta property="og:url" content="https://browser.bebitterbebetter.com.br/">
 <meta property="og:image" content="https://browser.bebitterbebetter.com.br/assets/social/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -27,12 +28,12 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-header">
   <div class="wrap">
-    <a class="logo" href="/" aria-label="Bitter Browser home"><img src="/assets/logo/lockup-paper.svg" alt="Bitter Browser" width="190" height="30"></a>
+    <a class="logo" href="/" aria-label="Bitter Browser home"><img src="/assets/logo/lockup-paper.svg" alt="Bitter Browser" width="178" height="28"></a>
     <nav aria-label="Main">
       <a class="wide" href="#features">Features</a>
-      <a href="#install">Install</a>
-      <a href="/brand/">Brand</a>
-      <a href="https://github.com/bernardopg/bitter-browser">GitHub</a>
+      <a class="wide" href="/brand/">Brand</a>
+      <a class="wide" href="https://github.com/bernardopg/bitter-browser">GitHub</a>
+      <a class="pill" href="#install">Install</a>
     </nav>
   </div>
 </header>
@@ -40,71 +41,138 @@
 <main id="main">
   <div class="dark hero">
     <div class="wrap">
-      <div class="grid">
-        <div>
-          <p class="eyebrow">Native web browser for Linux</p>
-          <h1>The web, <em>unsweetened.</em></h1>
-          <p class="lead">Bitter Browser takes out the trackers, the ads and the noise, and keeps your tabs in a quiet sidebar. Built in Rust on GTK&nbsp;4 and WebKitGTK, it feels at home on GNOME, KDE Plasma and every Linux desktop.</p>
-          <div class="command" role="group" aria-label="Install command">
-            <code id="cmd-hero">curl -fsSL https://browser.bebitterbebetter.com.br/install.sh | sh</code>
-            <button class="copy" type="button" data-copy="cmd-hero">Copy</button>
-          </div>
-          <div class="actions">
-            <a class="button primary" href="#install">All install options</a>
-            <a class="button ghost" href="https://github.com/bernardopg/bitter-browser/releases/latest">Download a package</a>
-          </div>
-        </div>
+      <a class="badge" href="https://github.com/bernardopg/bitter-browser/releases/latest"><b>New</b> Native packages for every Linux</a>
+      <h1>The web,<br><em>unsweetened.</em></h1>
+      <p class="lead">A native browser for Linux that takes out the trackers, the ads and the noise. Tabs live in a quiet sidebar, everything is one keystroke away, and nothing is added that you did not ask for.</p>
+      <div class="actions">
+        <a class="button primary" href="#install">Install Bitter Browser</a>
+        <a class="button ghost" href="#features">See what's inside</a>
       </div>
-      <img class="shot" src="/assets/screens/history-dark.png" width="1200" height="800" alt="Bitter Browser with tabs in a sidebar showing the History page in the dark color scheme">
+      <div class="command" role="group" aria-label="Install command">
+        <code id="cmd-hero">curl -fsSL https://browser.bebitterbebetter.com.br/install.sh | sh</code>
+        <button class="copy" type="button" data-copy="cmd-hero">Copy</button>
+      </div>
+      <ul class="facts">
+        <li>Free and open source</li>
+        <li>Rust · GTK 4 · WebKitGTK</li>
+        <li>Wayland and X11</li>
+        <li>No telemetry</li>
+      </ul>
+    </div>
+    <div class="stage">
+      <img src="/assets/screens/hero-1600.webp" srcset="/assets/screens/hero-1600.webp 1600w, /assets/screens/hero-2400.webp 2400w" sizes="(min-width: 1280px) 1280px, 100vw" width="3200" height="2000" alt="Bitter Browser in the dark color scheme reading a long-form essay, with tabs in a sidebar, and a second window in the light scheme showing the New Tab page">
     </div>
   </div>
 
-  <section id="features" class="light">
+  <section class="light" aria-labelledby="values-title">
     <div class="wrap">
-      <div class="section-head">
+      <div class="section-head center">
         <p class="eyebrow">Nothing added</p>
-        <h2>Everything you need, <em>nothing</em> you didn't ask for.</h2>
+        <h2 id="values-title">Built on four <em>bitter</em> promises.</h2>
       </div>
-      <div class="features">
-        <article class="card"><img class="drop" src="/assets/logo/mark.svg" alt=""><h3>Ads and trackers blocked</h3><p>EasyList and EasyPrivacy filters on by default, with a per-site switch when a page needs it.</p></article>
-        <article class="card"><img class="drop" src="/assets/logo/mark.svg" alt=""><h3>Tabs in a sidebar</h3><p>Vertical tabs in two workspaces, each with its own order and selection. Session restore loads only what you look at.</p></article>
-        <article class="card"><img class="drop" src="/assets/logo/mark.svg" alt=""><h3>HTTPS-only mode</h3><p>Upgrade every connection, block third-party cookies, and ask before sites use your camera, microphone or location.</p></article>
-        <article class="card"><img class="drop" src="/assets/logo/mark.svg" alt=""><h3>Native to your desktop</h3><p>GTK&nbsp;4 and libadwaita, light and dark schemes, Wayland and X11. One click makes it your default browser.</p></article>
-        <article class="card"><img class="drop" src="/assets/logo/mark.svg" alt=""><h3>Fast to start, easy to read</h3><p>Rust and WebKitGTK, local suggestions from history and bookmarks, find in page, zoom per site, full screen.</p></article>
-        <article class="card"><img class="drop" src="/assets/logo/mark.svg" alt=""><h3>Open source</h3><p>Mozilla Public License 2.0. Signed releases with checksums, an SBOM and build provenance for every file.</p></article>
+      <div class="values">
+        <div class="value"><strong>0<span>.</span></strong><p>Trackers added by the browser. No telemetry, no accounts, no sponsored tiles.</p></div>
+        <div class="value"><strong>2<span>×</span></strong><p>Workspaces, each with its own tabs and selection, to keep work and life apart.</p></div>
+        <div class="value"><strong>7<span>+</span></strong><p>Linux distributions where every release is installed and tested before it ships.</p></div>
+        <div class="value"><strong>100<span>%</span></strong><p>Open source under the Mozilla Public License 2.0, with signed and attested releases.</p></div>
       </div>
     </div>
   </section>
 
-  <div class="dark quote">
+  <section id="features" class="paper" aria-label="Features">
+    <div class="wrap">
+      <article class="feature">
+        <div class="copy-col">
+          <p class="eyebrow">Privacy by default</p>
+          <h2>Blocked before they <em>load.</em></h2>
+          <p>EasyList and EasyPrivacy run from the first page, cross-site tracking prevention and third-party cookie blocking are on, and HTTPS-only mode is one switch away. When a site needs an exception, it is one click in the address bar.</p>
+          <ul class="chips"><li>Ad and tracker blocking</li><li>HTTPS-only mode</li><li>Per-site permissions</li><li>Clear data in one step</li></ul>
+        </div>
+        <img src="/assets/screens/privacy-1600.webp" srcset="/assets/screens/privacy-1600.webp 1600w, /assets/screens/privacy-2400.webp 2400w" sizes="(min-width: 960px) 700px, 100vw" width="3168" height="2088" loading="lazy" alt="The Privacy page of Preferences with ad and tracker blocking, tracking prevention and third-party cookie blocking turned on">
+      </article>
+
+      <article class="feature flip">
+        <div class="copy-col">
+          <p class="eyebrow">Command palette</p>
+          <h2>Everything, one <em>keystroke</em> away.</h2>
+          <p>Press <kbd>Ctrl</kbd> <kbd>K</kbd> and type. Open, close and reorder tabs, find in the page, bookmark, zoom, clear data or change site permissions without reaching for the mouse.</p>
+          <ul class="chips"><li>Fuzzy search</li><li>Shortcuts shown inline</li><li>Keyboard first</li></ul>
+        </div>
+        <img src="/assets/screens/palette-1600.webp" srcset="/assets/screens/palette-1600.webp 1600w, /assets/screens/palette-2400.webp 2400w" sizes="(min-width: 960px) 700px, 100vw" width="3168" height="2088" loading="lazy" alt="The command palette over a documentation page, filtering tab commands with their keyboard shortcuts">
+      </article>
+
+      <article class="feature">
+        <div class="copy-col">
+          <p class="eyebrow">Two workspaces</p>
+          <h2>Work and life, <em>apart.</em></h2>
+          <p>Tabs stack in a vertical sidebar with full titles and site icons. Main and Second keep their own order and selection, and the session comes back exactly as you left it — loading only the tab you look at.</p>
+          <ul class="chips"><li>Vertical tabs</li><li>Session restore</li><li>Reopen closed tabs</li></ul>
+        </div>
+        <img src="/assets/screens/workspaces-1600.webp" srcset="/assets/screens/workspaces-1600.webp 1600w, /assets/screens/workspaces-2400.webp 2400w" sizes="(min-width: 960px) 700px, 100vw" width="3168" height="2088" loading="lazy" alt="The Second workspace with a recipe page in the light color scheme">
+      </article>
+
+      <article class="feature flip">
+        <div class="copy-col">
+          <p class="eyebrow">Local first</p>
+          <h2>Your history stays <em>yours.</em></h2>
+          <p>History, bookmarks and suggestions live in a local database on your disk. The address bar suggests from them as you type; nothing is sent to a server to be remembered.</p>
+          <ul class="chips"><li>Instant suggestions</li><li>Editable bookmarks</li><li>Remove any entry</li></ul>
+        </div>
+        <img src="/assets/screens/history-1600.webp" srcset="/assets/screens/history-1600.webp 1600w, /assets/screens/history-2400.webp 2400w" sizes="(min-width: 960px) 700px, 100vw" width="3168" height="2088" loading="lazy" alt="The History page in the dark color scheme with a filter field and recently visited sites">
+      </article>
+
+      <article class="feature">
+        <div class="copy-col">
+          <p class="eyebrow">Native to Linux</p>
+          <h2>Feels at home on <em>your</em> desktop.</h2>
+          <p>GTK 4 and libadwaita, light and dark schemes, Wayland and X11. It starts fast, follows your system fonts and colors, and becomes your default browser with a single click.</p>
+          <ul class="chips"><li>GNOME</li><li>KDE Plasma</li><li>Xfce</li><li>Cinnamon</li><li>Hyprland</li></ul>
+        </div>
+        <img src="/assets/screens/newtab-1600.webp" srcset="/assets/screens/newtab-1600.webp 1600w, /assets/screens/newtab-2400.webp 2400w" sizes="(min-width: 960px) 700px, 100vw" width="3168" height="2088" loading="lazy" alt="The New Tab page with keyboard hints and frequently visited sites in the light color scheme">
+      </article>
+    </div>
+  </section>
+
+  <section class="dark quote" aria-label="Tagline">
     <div class="wrap">
       <p>Be bitter. Browse better.</p>
       <span>Zero added trackers</span>
     </div>
-  </div>
+  </section>
 
-  <section id="install" class="paper">
+  <section id="install" class="light" aria-labelledby="install-title">
     <div class="wrap">
       <div class="section-head">
         <p class="eyebrow">Install</p>
-        <h2>Pick your distribution.</h2>
-        <p>Every release is built and tested on each of these systems before it is published.</p>
+        <h2 id="install-title">Pick your Linux.</h2>
+        <p>Every release is built from source, installed on each of these systems and tested before it is published.</p>
       </div>
       <div class="install">
-        <div class="row"><div><strong>Any distribution</strong><small>Picks the right package and checks it</small></div>
+        <div class="distro featured"><header><strong>Any distribution</strong><small>Detects your system and checks the download</small></header>
           <div class="command"><code id="c-any">curl -fsSL https://browser.bebitterbebetter.com.br/install.sh | sh</code><button class="copy" type="button" data-copy="c-any">Copy</button></div></div>
-        <div class="row"><div><strong>Arch Linux · AUR</strong><small>Manjaro, EndeavourOS, CachyOS</small></div>
-          <div class="command"><code id="c-aur">yay -S bitter-browser</code><button class="copy" type="button" data-copy="c-aur">Copy</button></div></div>
-        <div class="row"><div><strong>Arch Linux · pacman</strong><small><a href="https://github.com/bernardopg/bitter-browser/blob/main/docs/distribution.md#arch-linux-pacman-repository">Add the signed repository</a> first</small></div>
+        <div class="distro"><header><strong>Arch Linux · AUR</strong><small>Manjaro, EndeavourOS, CachyOS</small></header>
+          <div class="command"><code id="c-aur">yay -S bitter-browser-bin</code><button class="copy" type="button" data-copy="c-aur">Copy</button></div></div>
+        <div class="distro"><header><strong>Arch Linux · pacman</strong><small><a href="https://github.com/bernardopg/bitter-browser/blob/main/docs/distribution.md#arch-linux-pacman-repository">Add the signed repository</a></small></header>
           <div class="command"><code id="c-pac">sudo pacman -S bitter-browser</code><button class="copy" type="button" data-copy="c-pac">Copy</button></div></div>
-        <div class="row"><div><strong>Debian · Ubuntu · Mint</strong><small>Debian 13, Ubuntu 25.10+, Mint 23</small></div>
+        <div class="distro"><header><strong>Debian · Ubuntu · Mint</strong><small>Debian 13, Ubuntu 25.10+, Mint 23</small></header>
           <div class="command"><code id="c-deb">curl -fsSL https://browser.bebitterbebetter.com.br/install.sh | sh -s -- --method deb</code><button class="copy" type="button" data-copy="c-deb">Copy</button></div></div>
-        <div class="row"><div><strong>Fedora</strong><small>Fedora 43 and newer</small></div>
+        <div class="distro"><header><strong>Fedora</strong><small>Fedora 43 and newer</small></header>
           <div class="command"><code id="c-rpm">curl -fsSL https://browser.bebitterbebetter.com.br/install.sh | sh -s -- --method rpm</code><button class="copy" type="button" data-copy="c-rpm">Copy</button></div></div>
-        <div class="row"><div><strong>Flatpak</strong><small>Ubuntu 24.04, Mint 22 and any other system</small></div>
+        <div class="distro"><header><strong>Flatpak</strong><small>Ubuntu 24.04, Mint 22 and everything else</small></header>
           <div class="command"><code id="c-flat">curl -fsSL https://browser.bebitterbebetter.com.br/install.sh | sh -s -- --method flatpak</code><button class="copy" type="button" data-copy="c-flat">Copy</button></div></div>
       </div>
-      <p class="note">Prefer to read before you run? <a href="https://github.com/bernardopg/bitter-browser/blob/main/scripts/install.sh">Read install.sh</a>, or download a package from the <a href="https://github.com/bernardopg/bitter-browser/releases/latest">latest release</a> and verify it with <code>sha256sum</code> and <code>gh attestation verify</code>. Desktop integration and the default-browser setting on GNOME, KDE Plasma, Xfce, Cinnamon and MATE: <a href="https://github.com/bernardopg/bitter-browser/blob/main/docs/distribution.md">distribution guide</a>.</p>
+      <p class="note">Prefer to read before you run? <a href="https://github.com/bernardopg/bitter-browser/blob/main/scripts/install.sh">Read install.sh</a>, or download a package from the <a href="https://github.com/bernardopg/bitter-browser/releases/latest">latest release</a> and verify it with <code>sha256sum</code> and <code>gh attestation verify</code>. Desktop integration on GNOME, KDE Plasma, Xfce, Cinnamon and MATE is in the <a href="https://github.com/bernardopg/bitter-browser/blob/main/docs/distribution.md">distribution guide</a>.</p>
+    </div>
+  </section>
+
+  <section class="dark final" aria-labelledby="final-title">
+    <div class="wrap">
+      <h2 id="final-title">Taste the <em>real</em> web.</h2>
+      <p class="lead">Free, open source and made for Linux.</p>
+      <div class="actions">
+        <a class="button primary" href="#install">Install now</a>
+        <a class="button ghost" href="https://github.com/bernardopg/bitter-browser">Star on GitHub</a>
+      </div>
     </div>
   </section>
 </main>

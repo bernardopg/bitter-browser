@@ -7,6 +7,23 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- New product screenshots captured from the real browser at 2× scale with
+  demo sites, framed for the website and README, and six screenshots in the
+  AppStream metainfo.
+- The website was rebuilt mobile first: no horizontal scrolling from 360 px
+  up, a feature tour with the new screenshots, and install cards per
+  distribution.
+- AUR publication is its own workflow (`aur.yml`), called by the release and
+  runnable by hand for a published release.
+- The *Packages* workflow runs on every pull request that changes more than
+  documentation, the website or the brand book, and its *Packages result*
+  job is a required check, so packaging changes cannot merge before every
+  package is built and installed.
+- Auto-merge is enabled only for pull requests into `main`; stacked pull
+  requests no longer merge into their base branch at once.
+
 ### Fixed
 
 - In the Flatpak, Preferences > General > Default browser claimed that Bitter
@@ -16,16 +33,6 @@ All notable changes to Bitter Browser are documented here. The format follows
   in `~/.local` when the installer runs as root, where it installs into
   `/usr/local`. The failed check skipped the AUR publication of 0.6.0.
 
-### Changed
-
-- AUR publication is its own workflow (`aur.yml`), called by the release and
-  runnable by hand for a published release.
-- The *Packages* workflow runs on every pull request that changes more than
-  documentation, the website or the brand book, and its *Packages result*
-  job is a required check, so packaging changes cannot merge before every
-  package is built and installed.
-- Auto-merge is enabled only for pull requests into `main`; stacked pull
-  requests no longer merge into their base branch at once.
 
 ## [0.6.0] - 2026-11-24
 

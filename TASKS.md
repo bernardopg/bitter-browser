@@ -54,8 +54,8 @@ Decided on 2026-11-24 as the top priority. Details and status:
   *Status:* `scripts/install.sh` is published with each release and tested after publishing. The site redirect is DIST-08.
 - [ ] **DIST-04 — Desktop integration and default browser.** Desktop file, icons in every size, metainfo, Xfce helper, Debian alternatives, and a Preferences action that makes the browser the default on GNOME, KDE Plasma, Xfce, Cinnamon and MATE. Depends: none.
   *Status:* Implemented. Missing: a manual check on each of the five desktops, recorded in the release check record.
-- [ ] **DIST-05 — Flathub.** The owner writes the Flathub manifest by hand and submits it (Flathub forbids AI-written manifests and AI-opened submissions), then verifies the app ID with the token on `browser.bebitterbebetter.com.br`. Depends: DIST-04.
-  *Status:* Upstream metadata, app ID and domain are ready.
+- [ ] **DIST-05 — Flathub (owner, postponed).** The owner writes the Flathub manifest by hand and submits it (Flathub forbids AI-written manifests and AI-opened submissions), discloses AI use, then verifies the app ID with the token on `browser.bebitterbebetter.com.br`. Depends: DIST-04, a release without known Flatpak bugs.
+  *Status:* Postponed by the owner on 2026-11-25. Upstream metadata, app ID, domain and the step-by-step guide ([docs/flathub.md](docs/flathub.md)) are ready.
 - [ ] **DIST-06 — APT, DNF and openSUSE repositories.** Automatic updates for `.deb` and `.rpm` users through COPR, the openSUSE Build Service or signed repositories on the project site. Depends: DIST-01.
   *Status:* Not started.
 - [ ] **DIST-07 — AppImage and aarch64.** An AppImage that keeps WebKit's bubblewrap sandbox (private mount namespace for the helper path, AppArmor on Ubuntu 24.04+), and arm64 builds of every format on GitHub's arm64 runners. Depends: DIST-01.

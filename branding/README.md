@@ -138,6 +138,29 @@ browser matches the desktop. Do not draw custom UI icons in the brand style.
 
 ## Imagery
 
+### Product screenshots
+
+The screenshots are captured from the real browser, not mocked up:
+
+```sh
+cargo build -p bitter-ui --locked          # or use the installed /usr/bin/bitter-ui
+scripts/headless-session.sh --screen 3000x1900x24 -- \
+  python3 branding/screenshots/capture.py /usr/bin/bitter-ui
+python3 branding/screenshots/compose.py
+```
+
+`capture.py` starts the browser at 2× scale (2880×1800) with a fresh
+profile, a prepared session and history, and serves six demo sites from
+`branding/screenshots/sites/` through a local proxy under `.example` names,
+so no request leaves the machine and no third-party brand appears.
+`compose.py` writes the framed website images to `site/assets/screens/`
+(WebP, 1600 and 2400 px) and the plain windows for the README and the
+AppStream metainfo to `docs/assets/screenshots/`. Rebuild the social images
+afterwards with `branding/build.py`, which embeds `reading-dark.png`.
+
+### Style
+
+
 - Show the real product: screenshots framed as a floating window with a
   soft shadow, on the espresso field with a warm orange glow.
 - Photography, when used: macro, warm, low-key light; dark roasted textures

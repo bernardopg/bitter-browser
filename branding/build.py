@@ -181,13 +181,13 @@ def png(source, target, width, height=None):
 
 # ---------------------------------------------------------------- the assets
 
-SHOT = ROOT / "docs/assets/history-dark.png"
+SHOT = ROOT / "docs/assets/screenshots/reading-dark.png"
 
 
 def product_shot(x, y, width):
     """The real browser, framed as a floating window with a soft shadow."""
     import base64
-    height = width * 800 / 1200
+    height = width * 1000 / 1600
     data = base64.b64encode(SHOT.read_bytes()).decode()
     r = width * 0.018
     uid = f"shot{int(x)}{int(y)}"

@@ -11,10 +11,8 @@ root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 rm -rf "$out"
 mkdir -p "$out"
 cp -a "$root/site/." "$out/"
-mkdir -p "$out/assets/screens"
+# site/assets/screens comes with site/ (branding/screenshots/compose.py).
 cp -a "$root/branding/logo" "$root/branding/icon" "$root/branding/social" "$root/branding/tokens" "$out/assets/"
-cp "$root/docs/assets/history-dark.png" "$root/docs/assets/bookmarks-light.png" \
-    "$root/docs/assets/preferences-dark.png" "$out/assets/screens/"
 cp "$root/branding/icon/favicon.ico" "$out/favicon.ico"
 
 # Media kit: every asset plus the brand book source.
@@ -23,7 +21,9 @@ trap 'rm -rf "$kit"; [ -n "${server:-}" ] && kill "$server" 2>/dev/null || true'
 mkdir -p "$kit/bitter-browser-media-kit"
 cp -a "$root/branding/logo" "$root/branding/icon" "$root/branding/social" "$root/branding/tokens" \
     "$root/branding/README.md" "$kit/bitter-browser-media-kit/"
-cp -a "$out/assets/screens" "$kit/bitter-browser-media-kit/"
+mkdir -p "$kit/bitter-browser-media-kit/screenshots"
+cp "$root"/docs/assets/screenshots/*.png "$kit/bitter-browser-media-kit/screenshots/"
+cp "$root"/site/assets/screens/*-2400.webp "$kit/bitter-browser-media-kit/screenshots/"
 (cd "$kit" && zip -qr -X "$out/brand/bitter-browser-media-kit.zip" bitter-browser-media-kit)
 
 # Brand book PDF, printed from the brand page.

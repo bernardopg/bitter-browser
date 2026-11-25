@@ -291,17 +291,9 @@ revoked public key, and rotate.
 
 ### Flathub
 
-Flathub needs a manifest in its own repository, reviewed by its maintainers.
-Its [generative AI policy](https://docs.flathub.org/docs/for-app-authors/requirements)
-says that AI tools must not write Flathub manifests or open or automate
-submission pull requests, and that submitters must disclose AI-generated
-material in the app. The owner submits the app: write the Flathub manifest by
-hand (the in-repository manifest builds from a local directory; Flathub needs
-the release archive and `cargo-sources.json`), disclose AI use, and open the
-pull request against `flathub/flathub`. After acceptance, add the token from
-the Flathub developer portal to
-`https://browser.bebitterbebetter.com.br/.well-known/org.flathub.VerifiedApps.txt`
-to verify the app.
+Not submitted yet (DIST-05). Flathub forbids AI-written manifests and
+AI-opened submissions, so the owner submits the app by hand following
+[docs/flathub.md](flathub.md).
 
 ### Not shipped yet
 

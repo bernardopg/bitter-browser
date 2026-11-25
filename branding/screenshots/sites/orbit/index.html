@@ -1,0 +1,31 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Solar activity — Orbit</title><link rel="icon" href="/favicon.png" sizes="64x64" type="image/png"><link rel="stylesheet" href="/shared.css">
+<style>
+body{background:#f3f6f9;color:#0f172a;padding:30px 40px}
+.top{display:flex;justify-content:space-between;align-items:center}.top h1{font-size:28px;margin:0;letter-spacing:-.02em}.top span{color:#64748b;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:22px}
+.card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 1px 2px rgba(15,23,42,.06),0 8px 24px -12px rgba(15,23,42,.12)}
+.card small{color:#64748b;font-size:13px}.card b{display:block;font-size:30px;margin-top:8px;letter-spacing:-.02em}.up{color:#059669;font-size:13px}.down{color:#dc2626;font-size:13px}
+.wide{grid-column:span 3;height:330px}.tall{height:330px}
+.legend{display:flex;gap:16px;font-size:12px;color:#64748b;margin-top:6px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.bar{display:flex;align-items:center;gap:10px;margin:14px 0;font-size:13px}.bar div{flex:1;height:8px;border-radius:99px;background:#e2e8f0;overflow:hidden}.bar div i{display:block;height:100%;border-radius:99px}
+</style></head><body>
+<div class="top"><h1>Solar activity</h1><span>Updated 2 minutes ago · UTC</span></div>
+<div class="grid">
+<div class="card"><small>Solar wind</small><b>482 km/s</b><span class="up">▲ 6.2% today</span></div>
+<div class="card"><small>Kp index</small><b>4.33</b><span class="down">▲ storm watch</span></div>
+<div class="card"><small>X-ray flux</small><b>C2.1</b><span class="up">▼ quieter</span></div>
+<div class="card"><small>Sunspots</small><b>148</b><span class="up">▲ 12 regions</span></div>
+<div class="card wide"><small>Solar wind speed, last 7 days</small><div class="legend"><span><i style="background:#0ea5e9"></i>Speed</span><span><i style="background:#f59e0b"></i>Density</span></div>
+<svg viewBox="0 0 900 250" width="100%" height="250"><defs><linearGradient id="a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0ea5e9" stop-opacity=".35"/><stop offset="1" stop-color="#0ea5e9" stop-opacity="0"/></linearGradient></defs>
+<g stroke="#e2e8f0">
+<line x1="0" y1="50" x2="900" y2="50"/><line x1="0" y1="110" x2="900" y2="110"/><line x1="0" y1="170" x2="900" y2="170"/></g>
+<path d="M0 170 C80 150 120 120 200 130 S330 80 420 95 S560 60 640 70 S780 110 900 60 V250 H0Z" fill="url(#a)"/>
+<path d="M0 170 C80 150 120 120 200 130 S330 80 420 95 S560 60 640 70 S780 110 900 60" fill="none" stroke="#0ea5e9" stroke-width="4"/>
+<path d="M0 200 C100 190 160 205 250 180 S420 200 500 170 S700 190 900 150" fill="none" stroke="#f59e0b" stroke-width="3" stroke-dasharray="2 8" stroke-linecap="round"/></svg></div>
+<div class="card tall"><small>Aurora chance tonight</small>
+<div class="bar">Tromsø<div><i style="width:86%;background:#10b981"></i></div>86%</div>
+<div class="bar">Reykjavík<div><i style="width:71%;background:#10b981"></i></div>71%</div>
+<div class="bar">Yellowknife<div><i style="width:64%;background:#22c55e"></i></div>64%</div>
+<div class="bar">Edinburgh<div><i style="width:23%;background:#f59e0b"></i></div>23%</div>
+<div class="bar">Berlin<div><i style="width:9%;background:#ef4444"></i></div>9%</div></div>
+</div></body></html>
