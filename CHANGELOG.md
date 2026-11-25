@@ -7,6 +7,8 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-25
+
 ### Changed
 
 - New product screenshots captured from the real browser at 2× scale with
@@ -247,6 +249,7 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 - Meson installation of the executable and the application icon.
 
+[0.6.1]: https://github.com/bernardopg/bitter-browser/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/bernardopg/bitter-browser/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/bernardopg/bitter-browser/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/bernardopg/bitter-browser/compare/v0.3.0...v0.4.0
