@@ -42,6 +42,28 @@ fn support_for(sandboxed: bool) -> Support {
     }
 }
 
+/// What the Default browser row in Preferences shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RowState {
+    /// Points to the desktop's settings (Flatpak).
+    SystemSettings,
+    /// This browser already opens web links.
+    IsDefault,
+    /// Offers the Make Default button.
+    CanMakeDefault,
+}
+
+/// Decides the row. A sandbox is checked first: inside it GIO only sees the
+/// application's own desktop file, so it would always report this browser
+/// as the default.
+pub fn row_state(support: Support, is_default: impl FnOnce() -> bool) -> RowState {
+    match support {
+        Support::SystemSettings => RowState::SystemSettings,
+        Support::Available if is_default() => RowState::IsDefault,
+        Support::Available => RowState::CanMakeDefault,
+    }
+}
+
 /// Whether the desktop opens web links with this browser.
 pub fn is_default() -> bool {
     gio::AppInfo::default_for_type(HANDLED_TYPES[1], true)
@@ -114,6 +136,17 @@ mod tests {
         assert!(is_own_id(DESKTOP_ID));
         assert!(!is_own_id("firefox.desktop"));
         assert!(!is_own_id("com.bitterbrowser.Browser.desktop"));
+    }
+
+    #[test]
+    fn a_sandbox_never_claims_to_be_the_default() {
+        let state = row_state(Support::SystemSettings, || panic!("not asked in a sandbox"));
+        assert_eq!(state, RowState::SystemSettings);
+        assert_eq!(row_state(Support::Available, || true), RowState::IsDefault);
+        assert_eq!(
+            row_state(Support::Available, || false),
+            RowState::CanMakeDefault
+        );
     }
 
     #[test]

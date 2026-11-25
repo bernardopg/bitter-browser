@@ -263,21 +263,24 @@ fn index_of<T: PartialEq>(choices: &[(T, String)], value: T) -> u32 {
 }
 
 fn default_browser_row(group: &adw::PreferencesGroup) {
-    use crate::default_browser::{self, Support};
+    use crate::default_browser::{self, RowState};
     let row = adw::ActionRow::builder()
         .title("Default browser")
         .use_markup(false)
         .build();
     group.add(&row);
-    if default_browser::is_default() {
-        row.set_subtitle("Bitter Browser opens web links on this computer");
-        return;
-    }
-    if default_browser::support() == Support::SystemSettings {
-        row.set_subtitle(
-            "Choose Bitter Browser under Default Applications in your system settings",
-        );
-        return;
+    match default_browser::row_state(default_browser::support(), default_browser::is_default) {
+        RowState::SystemSettings => {
+            row.set_subtitle(
+                "Choose Bitter Browser under Default Applications in your system settings",
+            );
+            return;
+        }
+        RowState::IsDefault => {
+            row.set_subtitle("Bitter Browser opens web links on this computer");
+            return;
+        }
+        RowState::CanMakeDefault => {}
     }
     row.set_subtitle("Another application opens web links on this computer");
     let button = gtk4::Button::builder()
