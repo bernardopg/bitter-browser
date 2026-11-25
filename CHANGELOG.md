@@ -7,6 +7,17 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The release check of the portable archive looked for the installed browser
+  in `~/.local` when the installer runs as root, where it installs into
+  `/usr/local`. The failed check skipped the AUR publication of 0.6.0.
+
+### Changed
+
+- AUR publication is its own workflow (`aur.yml`), called by the release and
+  runnable by hand for a published release.
+
 ## [0.6.0] - 2026-11-24
 
 ### Added

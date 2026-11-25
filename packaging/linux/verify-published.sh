@@ -32,7 +32,11 @@ if [ "$method" = pacman-repo ]; then
 else
     curl -fsSL "$base/install.sh" -o /tmp/install.sh
     sh /tmp/install.sh --method "$method" --version "$version"
-    case $method in tarball) bin=$HOME/.local/bin ;; *) bin=/usr/bin ;; esac
+    # The portable archive installs into /usr/local as root and ~/.local otherwise.
+    case $method in
+        tarball) if [ "$(id -u)" = 0 ]; then bin=/usr/local/bin; else bin=$HOME/.local/bin; fi ;;
+        *) bin=/usr/bin ;;
+    esac
 fi
 
 test "$("$bin/bitter-ui" --version)" = "Bitter Browser $version"

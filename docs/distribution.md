@@ -243,6 +243,10 @@ one-line installer and the pacman repository on each distribution
 recipes to the AUR with
 [`KSXGitHub/github-actions-deploy-aur`](https://github.com/KSXGitHub/github-actions-deploy-aur),
 which regenerates `.SRCINFO`. The first push creates each AUR package.
+The AUR step is its own workflow, `.github/workflows/aur.yml`: it takes the
+recipes from the tag and the checksums from the published, attested assets.
+To publish an existing release again (for example after an AUR outage), run
+`gh workflow run aur.yml -f tag=vX.Y.Z`.
 
 Building locally needs Docker; for example, the `.deb`:
 

@@ -1,0 +1,127 @@
+name: AUR
+# Publishes bitter-browser, bitter-browser-bin and bitter-browser-git to the
+# AUR from a published GitHub release. The Release workflow calls it after the
+# published release installs on every distribution; run it by hand to publish
+# (or republish) an existing release:
+#   gh workflow run aur.yml -f tag=vX.Y.Z
+# The recipes come from the tagged packaging files, with the checksums of the
+# release assets after their checksums and attestations are verified.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+    secrets:
+      AUR_USERNAME:
+        required: true
+      AUR_EMAIL:
+        required: true
+      AUR_SSH_PRIVATE_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release tag, for example v0.6.0
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: aur
+  cancel-in-progress: false
+jobs:
+  aur:
+    name: Publish to the AUR
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
+      - name: Prepare the recipes from the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "Not a release tag: $TAG" >&2; exit 1 ;; esac
+          version=${TAG#v}
+          test "$(git describe --exact-match --tags HEAD)" = "$TAG"
+          mkdir release
+          (
+            cd release
+            gh release download "$TAG" -p "bitter-browser-$version-sha256.txt" \
+              -p "bitter-browser-$version.tar.gz" -p "bitter-browser-$version-linux-x86_64.tar.xz"
+            sha256sum -c --ignore-missing "bitter-browser-$version-sha256.txt"
+            for file in "bitter-browser-$version.tar.gz" "bitter-browser-$version-linux-x86_64.tar.xz"; do
+              gh attestation verify "$file" --repo "$GH_REPO" >/dev/null
+            done
+          )
+          source_sum=$(sha256sum "release/bitter-browser-$version.tar.gz" | cut -d' ' -f1)
+          binary_sum=$(sha256sum "release/bitter-browser-$version-linux-x86_64.tar.xz" | cut -d' ' -f1)
+          commit=$(git rev-parse --short=7 HEAD)
+          mkdir -p aur/bitter-browser aur/bitter-browser-bin aur/bitter-browser-git
+          sed "s/^pkgver=.*/pkgver=$version/; s/^pkgrel=.*/pkgrel=1/; s/^sha256sums=('SKIP')\$/sha256sums=('$source_sum')/" \
+            packaging/arch/PKGBUILD > aur/bitter-browser/PKGBUILD
+          sed "s/^pkgver=.*/pkgver=$version/; s/^pkgrel=.*/pkgrel=1/; s/^sha256sums_x86_64=('SKIP')\$/sha256sums_x86_64=('$binary_sum')/" \
+            packaging/arch-bin/PKGBUILD > aur/bitter-browser-bin/PKGBUILD
+          sed "s/^pkgver=.*/pkgver=$version.r0.g$commit/; s/^pkgrel=.*/pkgrel=1/" PKGBUILD > aur/bitter-browser-git/PKGBUILD
+          grep -q "^sha256sums=('$source_sum')$" aur/bitter-browser/PKGBUILD
+          grep -q "^sha256sums_x86_64=('$binary_sum')$" aur/bitter-browser-bin/PKGBUILD
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      # The AUR has short maintenance windows that reject SSH pushes.
+      - name: Wait for the AUR
+        run: |
+          for attempt in $(seq 1 20); do
+            if git ls-remote https://aur.archlinux.org/bitter-browser.git >/dev/null 2>&1; then
+              echo "AUR reachable (attempt $attempt)"
+              exit 0
+            fi
+            echo "AUR unreachable (attempt $attempt/20); retrying in 30 s"
+            sleep 30
+          done
+          exit 1
+      # Each step publishes: it validates the PKGBUILD, regenerates .SRCINFO and
+      # pushes to the AUR. The first push creates the package.
+      - name: Publish bitter-browser
+        uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v4.2.0
+        with:
+          pkgname: bitter-browser
+          pkgbuild: aur/bitter-browser/PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update to ${{ env.VERSION }}
+          ssh_keyscan_types: rsa,ecdsa,ed25519
+      - name: Publish bitter-browser-bin
+        uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v4.2.0
+        with:
+          pkgname: bitter-browser-bin
+          pkgbuild: aur/bitter-browser-bin/PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update to ${{ env.VERSION }}
+          ssh_keyscan_types: rsa,ecdsa,ed25519
+      - name: Publish bitter-browser-git
+        uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v4.2.0
+        with:
+          pkgname: bitter-browser-git
+          pkgbuild: aur/bitter-browser-git/PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Sync the recipe with ${{ env.VERSION }}
+          ssh_keyscan_types: rsa,ecdsa,ed25519
+      - name: Check the AUR packages
+        run: |
+          for pkg in bitter-browser bitter-browser-bin; do
+            version=$(curl -fsSL "https://aur.archlinux.org/rpc/v5/info?arg[]=$pkg" |
+              python3 -c 'import json,sys; r=json.load(sys.stdin)["results"]; print(r[0]["Version"] if r else "")')
+            echo "$pkg: $version"
+            test "$version" = "$VERSION-1"
+          done
