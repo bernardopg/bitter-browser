@@ -26,30 +26,43 @@ custom_target(
 
 # Install desktop file
 install_data(
-  'crates/bitter-ui/data/com.bitterbrowser.Browser.desktop',
+  'crates/bitter-ui/data/br.com.bebitterbebetter.browser.Bitter.desktop',
   install_dir: get_option('datadir') / 'applications'
 )
 
-# Install application icon
+# Install application icons (scalable, symbolic and PNG sizes)
+install_subdir(
+  'crates/bitter-ui/data/icons/hicolor',
+  install_dir: get_option('datadir') / 'icons',
+)
+
+# Register as a web browser helper for Xfce's preferred applications
 install_data(
-  'crates/bitter-ui/data/icons/com.bitterbrowser.Browser.svg',
-  install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps'
+  'crates/bitter-ui/data/xfce4/helpers/bitter-browser.desktop',
+  install_dir: get_option('datadir') / 'xfce4' / 'helpers',
+)
+
+# License
+install_data(
+  'LICENSE',
+  install_dir: get_option('datadir') / 'licenses' / meson.project_name(),
 )
 
 # Install appdata
 install_data(
-  'crates/bitter-ui/data/com.bitterbrowser.Browser.metainfo.xml',
+  'crates/bitter-ui/data/br.com.bebitterbebetter.browser.Bitter.metainfo.xml',
   install_dir: get_option('datadir') / 'metainfo'
 )
 
 # Install gschema
 install_data(
-  'crates/bitter-ui/data/com.bitterbrowser.Browser.gschema.xml',
+  'crates/bitter-ui/data/br.com.bebitterbebetter.browser.Bitter.gschema.xml',
   install_dir: get_option('datadir') / 'glib-2.0' / 'schemas'
 )
 
 # Compile schemas
 gnome.post_install(
   glib_compile_schemas: true,
+  gtk_update_icon_cache: true,
   update_desktop_database: true,
 )

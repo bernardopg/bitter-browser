@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.bitterbrowser.Browser</id>
+  <id>br.com.bebitterbebetter.browser.Bitter</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MPL-2.0</project_license>
   <name>Bitter Browser</name>
   <summary>Focused, native web browser for the Linux desktop</summary>
-  <developer id="io.github.bernardopg">
+  <developer id="br.com.bebitterbebetter">
     <name>Bitter Browser Contributors</name>
   </developer>
   <description>
@@ -27,7 +27,30 @@
       HTTPS-only mode.
     </p>
   </description>
-  <launchable type="desktop-id">com.bitterbrowser.Browser.desktop</launchable>
+  <launchable type="desktop-id">br.com.bebitterbebetter.browser.Bitter.desktop</launchable>
+  <provides>
+    <binary>bitter-ui</binary>
+    <binary>bitter-cli</binary>
+    <id>com.bitterbrowser.Browser</id>
+    <id>com.bitterbrowser.Browser.desktop</id>
+  </provides>
+  <replaces>
+    <id>com.bitterbrowser.Browser</id>
+  </replaces>
+  <keywords>
+    <keyword>web</keyword>
+    <keyword>browser</keyword>
+    <keyword>internet</keyword>
+    <keyword>webkit</keyword>
+    <keyword>privacy</keyword>
+  </keywords>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
   <screenshots>
     <screenshot type="default">
       <caption>History in the dark color scheme</caption>
@@ -42,10 +65,15 @@
       <image>https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/preferences-dark.png</image>
     </screenshot>
   </screenshots>
-  <url type="homepage">https://github.com/bernardopg/bitter-browser</url>
+  <url type="homepage">https://browser.bebitterbebetter.com.br/</url>
   <url type="bugtracker">https://github.com/bernardopg/bitter-browser/issues</url>
   <url type="vcs-browser">https://github.com/bernardopg/bitter-browser</url>
   <url type="donation">https://github.com/sponsors/bernardopg</url>
+  <url type="contribute">https://github.com/bernardopg/bitter-browser/blob/main/CONTRIBUTING.md</url>
+  <branding>
+    <color type="primary" scheme_preference="light">#f3ecdf</color>
+    <color type="primary" scheme_preference="dark">#2a1d17</color>
+  </branding>
   <content_rating type="oars-1.1"/>
   <categories>
     <category>Network</category>

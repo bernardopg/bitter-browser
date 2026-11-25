@@ -1,5 +1,5 @@
 {
-    "app-id": "com.bitterbrowser.Browser",
+    "app-id": "br.com.bebitterbebetter.browser.Bitter",
     "runtime": "org.gnome.Platform",
     "runtime-version": "51",
     "sdk": "org.gnome.Sdk",
