@@ -262,7 +262,47 @@ fn index_of<T: PartialEq>(choices: &[(T, String)], value: T) -> u32 {
         .unwrap_or_default() as u32
 }
 
+fn default_browser_row(group: &adw::PreferencesGroup) {
+    use crate::default_browser::{self, Support};
+    let row = adw::ActionRow::builder()
+        .title("Default browser")
+        .use_markup(false)
+        .build();
+    group.add(&row);
+    if default_browser::is_default() {
+        row.set_subtitle("Bitter Browser opens web links on this computer");
+        return;
+    }
+    if default_browser::support() == Support::SystemSettings {
+        row.set_subtitle(
+            "Choose Bitter Browser under Default Applications in your system settings",
+        );
+        return;
+    }
+    row.set_subtitle("Another application opens web links on this computer");
+    let button = gtk4::Button::builder()
+        .label("Make Default")
+        .valign(gtk4::Align::Center)
+        .css_classes(vec!["suggested-action"])
+        .build();
+    row.add_suffix(&button);
+    button.connect_clicked(glib::clone!(
+        #[weak]
+        row,
+        move |button| match default_browser::make_default() {
+            Ok(()) => {
+                row.set_subtitle("Bitter Browser opens web links on this computer");
+                button.set_visible(false);
+            }
+            Err(error) =>
+                row.set_subtitle(&format!("Could not change the default browser: {error}")),
+        }
+    ));
+}
+
 fn general_page(context: &Rc<Context>, page: &adw::PreferencesPage) {
+    let system = group(page, "System", None);
+    default_browser_row(&system);
     let startup = group(page, "Startup", None);
     switch(
         context,

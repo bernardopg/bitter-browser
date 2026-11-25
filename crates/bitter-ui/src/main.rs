@@ -1,6 +1,7 @@
 mod app;
 mod command_palette;
 mod content_blocking;
+mod default_browser;
 mod downloads;
 mod find_bar;
 mod https_only;
