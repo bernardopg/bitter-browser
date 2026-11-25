@@ -3,7 +3,7 @@
 # Debian 13 and verified on Arch Linux by the release workflow).
 pkgname=bitter-browser-bin
 _pkgname=bitter-browser
-pkgver=0.5.0
+pkgver=0.6.0
 pkgrel=1
 pkgdesc='Focused, native web browser for the Linux desktop (prebuilt binary)'
 arch=('x86_64')

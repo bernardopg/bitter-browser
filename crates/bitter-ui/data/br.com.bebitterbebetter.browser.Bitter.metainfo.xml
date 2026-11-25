@@ -80,6 +80,18 @@
     <category>WebBrowser</category>
   </categories>
   <releases>
+    <release version="0.6.0" date="2026-11-24">
+      <url type="details">https://github.com/bernardopg/bitter-browser/releases/tag/v0.6.0</url>
+      <description>
+        <p>Native packages for the main Linux distributions, a default browser setting and a new look.</p>
+        <ul>
+          <li>Install with one command, from the AUR, a signed pacman repository, or .deb, .rpm and portable packages</li>
+          <li>Make Bitter Browser the default browser from Preferences</li>
+          <li>A new application icon and visual identity</li>
+          <li>The application ID is now br.com.bebitterbebetter.browser.Bitter</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.5.0" date="2026-11-23">
       <url type="details">https://github.com/bernardopg/bitter-browser/releases/tag/v0.5.0</url>
       <description>

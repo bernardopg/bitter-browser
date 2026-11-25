@@ -6,7 +6,7 @@
 %global debug_package %{nil}
 
 Name:           bitter-browser
-Version:        0.5.0
+Version:        0.6.0
 Release:        1%{?dist}
 Summary:        Focused, native web browser for the Linux desktop
 License:        MPL-2.0
@@ -66,5 +66,8 @@ appstreamcli validate --no-net %{buildroot}%{_metainfodir}/%{app_id}.metainfo.xm
 %{_datadir}/xfce4/helpers/bitter-browser.desktop
 
 %changelog
+* Tue Nov 24 2026 Bitter Browser Contributors <bernardopg@users.noreply.github.com> - 0.6.0-1
+- Native packages, default browser setting, new application ID and visual identity
+
 * Tue Nov 24 2026 Bitter Browser Contributors <bernardopg@users.noreply.github.com> - 0.5.0-1
 - See https://github.com/bernardopg/bitter-browser/blob/main/CHANGELOG.md
