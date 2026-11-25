@@ -60,14 +60,15 @@ jobs:
       actions: write
       contents: read
     steps:
-      - name: Start CI and CodeQL when main has not been checked
+      - name: Start CI, CodeQL and the website deploy when main has not been checked
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           DEFAULT_BRANCH=$(gh api "repos/$GH_REPO" --jq .default_branch)
           sha=$(gh api "repos/$GH_REPO/commits/$DEFAULT_BRANCH" --jq .sha)
-          for workflow in ci.yml codeql.yml; do
+          # Auto-merges use GITHUB_TOKEN, which starts no push workflows.
+          for workflow in ci.yml codeql.yml site.yml; do
             runs=$(gh run list --workflow "$workflow" --commit "$sha" --json databaseId --jq length)
             if [ "$runs" = 0 ]; then
               gh workflow run "$workflow" --ref "$DEFAULT_BRANCH"
