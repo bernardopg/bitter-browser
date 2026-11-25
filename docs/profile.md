@@ -11,7 +11,7 @@ when the respective variable is unset.
 | `$XDG_DATA_HOME/bitter-browser/` | `history.sqlite`, `bookmarks.sqlite`, `session.json`, `zoom.json`, `downloads.json`, `site-settings.json` (permissions and sites with blocking off) and `filter-lists/` (downloaded EasyList and EasyPrivacy) |
 | `$XDG_DATA_HOME/bitter-ui/` | Persistent WebKit website data |
 | `$XDG_CACHE_HOME/bitter-ui/` | WebKit cache and `content-filters/` (compiled content blockers, rebuilt when missing) |
-| GSettings `com.bitterbrowser.Browser` | Window size and maximized state |
+| GSettings `br.com.bebitterbebetter.browser.Bitter` | Window size and maximized state |
 | XDG download directory | Downloaded files |
 
 The WebKit directory names match earlier releases, keeping existing website

@@ -1,0 +1,2 @@
+# Flathub verification tokens for br.com.bebitterbebetter.browser.Bitter (one per line).
+# Add the token from the Flathub developer portal after the app is accepted.

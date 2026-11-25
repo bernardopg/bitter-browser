@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://browser.bebitterbebetter.com.br/sitemap.xml

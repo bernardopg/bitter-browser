@@ -14,7 +14,7 @@ pub struct BitterApp {
 impl BitterApp {
     pub fn new() -> Self {
         let app = adw::Application::builder()
-            .application_id("com.bitterbrowser.Browser")
+            .application_id("br.com.bebitterbebetter.browser.Bitter")
             .flags(gio::ApplicationFlags::HANDLES_OPEN)
             .build();
         let startup_failed = Rc::new(Cell::new(false));

@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+# Offer Bitter Browser for the Debian x-www-browser and gnome-www-browser
+# alternatives, which older tools use to open web links. Priority 40 keeps
+# an already chosen browser unless the administrator changes it.
+if [ "$1" = configure ]; then
+    update-alternatives --install /usr/bin/x-www-browser x-www-browser /usr/bin/bitter-ui 40
+    update-alternatives --install /usr/bin/gnome-www-browser gnome-www-browser /usr/bin/bitter-ui 40
+fi
+exit 0

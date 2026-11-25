@@ -32,7 +32,12 @@ def versions():
     yield "meson.build", one(r"^\s*version:\s*'([^']+)'", read("meson.build"), "meson.build")
     yield "packaging/arch/PKGBUILD", one(r"^pkgver=(\S+)$", read("packaging/arch/PKGBUILD"),
                                          "packaging/arch/PKGBUILD")
-    metainfo = read("crates/bitter-ui/data/com.bitterbrowser.Browser.metainfo.xml")
+    yield "packaging/arch-bin/PKGBUILD", one(r"^pkgver=(\S+)$", read("packaging/arch-bin/PKGBUILD"),
+                                             "packaging/arch-bin/PKGBUILD")
+    yield "packaging/rpm/bitter-browser.spec", one(r"^Version:\s+(\S+)$",
+                                                   read("packaging/rpm/bitter-browser.spec"),
+                                                   "packaging/rpm/bitter-browser.spec")
+    metainfo = read("crates/bitter-ui/data/br.com.bebitterbebetter.browser.Bitter.metainfo.xml")
     releases = re.findall(r'<release version="([^"]+)"', metainfo)
     if not releases:
         sys.exit("metainfo: no <release> entries")

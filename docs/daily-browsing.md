@@ -138,7 +138,7 @@ bitter-ui --version
 bitter-ui --help
 bitter-cli https://example.org       # launcher with the same behavior
 bitter-cli --version
-xdg-settings set default-web-browser com.bitterbrowser.Browser.desktop
+xdg-settings set default-web-browser br.com.bebitterbebetter.browser.Bitter.desktop
 ```
 
 `bitter-cli` is a small launcher installed next to `bitter-ui`. It accepts
@@ -152,9 +152,11 @@ Give full addresses with their scheme. A bare name such as `example.org` is
 treated as a file in the current directory, as with other GTK
 applications.
 
-Under Flatpak, use `flatpak run com.bitterbrowser.Browser` with the same
-arguments. Desktop environments can also set the default browser in their
-settings.
+Under Flatpak, use `flatpak run br.com.bebitterbebetter.browser.Bitter` with the same
+arguments. **Preferences > General > Default browser > Make Default** sets the
+default browser from inside the browser; desktop environments can also set it
+in their settings. [Distribution](distribution.md#make-bitter-browser-the-default-browser)
+lists the setting on each desktop.
 
 ## Verification
 

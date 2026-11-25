@@ -1,0 +1,17 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Bitter Browser
+Upstream-Contact: https://github.com/bernardopg/bitter-browser/issues
+Source: https://github.com/bernardopg/bitter-browser
+
+Files: *
+Copyright: Bitter Browser Contributors
+License: MPL-2.0
+ This Source Code Form is subject to the terms of the Mozilla Public
+ License, v. 2.0. If a copy of the MPL was not distributed with this
+ file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ .
+ On Debian systems, the full text of the Mozilla Public License 2.0 can be
+ found in the file /usr/share/common-licenses/MPL-2.0.
+Comment: The binaries statically link Rust crates listed in Cargo.lock and a
+ bundled SQLite (public domain). The SPDX SBOM attached to each release lists
+ them with their licenses.

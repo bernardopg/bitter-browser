@@ -67,3 +67,8 @@ __pycache__/
 
 # Local release check records (see AGENTS.md, "Release check records")
 /release-checks/
+
+# Local secrets (release keys); see .env.example
+/.env
+/.env.*
+!/.env.example

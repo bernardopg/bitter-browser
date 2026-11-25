@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Bitter Browser
+GenericName=Web Browser
+Comment=Focused, native web browser for the Linux desktop
+Keywords=web;browser;internet;www;http;https;
+Exec=bitter-ui %U
+Icon=br.com.bebitterbebetter.browser.Bitter
+Terminal=false
+Categories=Network;WebBrowser;GTK;
+MimeType=text/html;text/xml;application/xhtml+xml;application/xml;application/rss+xml;application/rdf+xml;image/gif;image/jpeg;image/png;image/webp;image/svg+xml;x-scheme-handler/http;x-scheme-handler/https;
+StartupNotify=true
+StartupWMClass=br.com.bebitterbebetter.browser.Bitter
+SingleMainWindow=true
+X-GNOME-UsesNotifications=true

@@ -437,7 +437,7 @@ class Browser:
                 else:
                     # Use the same application action as Ctrl+Q, even if
                     # the inspector or a dialog currently has keyboard focus.
-                    subprocess.run(["gapplication", "action", "com.bitterbrowser.Browser", "quit"],
+                    subprocess.run(["gapplication", "action", "br.com.bebitterbebetter.browser.Bitter", "quit"],
                                    env=self.env, check=True, timeout=5)
                 code = self.process.wait(timeout=10)
                 assert crash or code == 0, f"Browser exited {code}\n{self.log.read_text()}"

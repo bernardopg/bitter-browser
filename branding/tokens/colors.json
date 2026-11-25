@@ -1,0 +1,38 @@
+{
+  "espresso": {
+    "hex": "#1C110D",
+    "use": "Ink, dark backgrounds, text on light"
+  },
+  "roast": {
+    "hex": "#3A2419",
+    "use": "Dark surfaces, gradients"
+  },
+  "cacao": {
+    "hex": "#5A3426",
+    "use": "Gradient highlight on dark"
+  },
+  "bitter-orange": {
+    "hex": "#E8793A",
+    "use": "Accent: the drop, calls to action, links"
+  },
+  "amber": {
+    "hex": "#F4A259",
+    "use": "Accent gradient start, highlights on dark"
+  },
+  "zest": {
+    "hex": "#D9622B",
+    "use": "Accent gradient end, pressed states"
+  },
+  "cream": {
+    "hex": "#F6EFE3",
+    "use": "Light backgrounds"
+  },
+  "paper": {
+    "hex": "#FBF6EE",
+    "use": "Lightest surface, text on dark"
+  },
+  "gentian": {
+    "hex": "#2F5D50",
+    "use": "Secondary accent for success and privacy cues, sparingly"
+  }
+}

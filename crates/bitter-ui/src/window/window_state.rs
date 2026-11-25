@@ -4,7 +4,7 @@
 use gtk4::{gio, prelude::*};
 use libadwaita as adw;
 
-const SCHEMA_ID: &str = "com.bitterbrowser.Browser";
+const SCHEMA_ID: &str = "br.com.bebitterbebetter.browser.Bitter";
 const MIN_WIDTH: i32 = 640;
 const MIN_HEIGHT: i32 = 480;
 
