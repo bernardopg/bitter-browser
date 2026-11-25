@@ -7,6 +7,8 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-24
+
 ### Added
 
 - Native packages for every release: `.deb` for Debian 13, Ubuntu 25.10+ and
@@ -218,6 +220,7 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 - Meson installation of the executable and the application icon.
 
+[0.6.0]: https://github.com/bernardopg/bitter-browser/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/bernardopg/bitter-browser/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/bernardopg/bitter-browser/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bernardopg/bitter-browser/compare/v0.2.1...v0.3.0
