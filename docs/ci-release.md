@@ -6,7 +6,7 @@ CodeQL analyzes Rust and GitHub Actions without a build. Dependabot checks Cargo
 
 Workflows use the automatically supplied, scoped `GITHUB_TOKEN`; no personal access token or third-party coverage service is required. Only the *Release* workflow reads repository secrets: the AUR account and SSH key and the pacman signing key, listed in [Distribution](distribution.md#secrets). Pull requests never receive them. Fork PR tokens are restricted. Local hooks are optional and must not be treated as security enforcement.
 
-Pull requests opened by the repository owner from a branch of this repository get auto-merge enabled with a merge commit. GitHub merges them only after all required checks pass and the branch is up to date with `main`; draft pull requests, forks and Dependabot are excluded. Disable it for one pull request with `gh pr merge --disable-auto`. Merges made with `GITHUB_TOKEN` start no workflows: GitHub sends no `closed` or `push` event for them, and repository auto-delete skips them. The hourly *Branch cleanup and main verification* workflow (`maintenance.yml`, also runnable with `gh workflow run maintenance.yml`) covers both gaps. It deletes the head branch of every merged pull request whose tip is already on `main` and that no open pull request uses, and it starts CI and CodeQL for a `main` commit that has no run yet. Merged branches are always deleted, on GitHub and locally; see [AGENTS.md](../AGENTS.md#cleaning-up-merged-branches-project-default).
+Pull requests into `main` opened by the repository owner from a branch of this repository get auto-merge enabled with a merge commit. Pull requests stacked on another branch do not, because that branch has no required checks and would merge them at once. GitHub merges them only after all required checks pass and the branch is up to date with `main`; draft pull requests, forks and Dependabot are excluded. Disable it for one pull request with `gh pr merge --disable-auto`. Merges made with `GITHUB_TOKEN` start no workflows: GitHub sends no `closed` or `push` event for them, and repository auto-delete skips them. The hourly *Branch cleanup and main verification* workflow (`maintenance.yml`, also runnable with `gh workflow run maintenance.yml`) covers both gaps. It deletes the head branch of every merged pull request whose tip is already on `main` and that no open pull request uses, and it starts CI and CodeQL for a `main` commit that has no run yet. Merged branches are always deleted, on GitHub and locally; see [AGENTS.md](../AGENTS.md#cleaning-up-merged-branches-project-default).
 
 ## Packaging
 
@@ -26,7 +26,9 @@ flatpak-builder --user --install --force-clean build-dir flatpak/br.com.bebitter
 crates in `prepare()`, build offline and run the display-free tests in
 `check()`. The `.deb`, `.rpm`, portable archive, AUR recipes and pacman
 repository come from `packaging/`; the *Packages* workflow builds and
-installs all of them on pull requests that touch packaging. See
+installs all of them on every pull request that changes more than
+documentation, the website or the brand book. Its *Packages result* job is a
+required check for `main`. See
 [Distribution and desktop integration](distribution.md).
 
 ## Releases

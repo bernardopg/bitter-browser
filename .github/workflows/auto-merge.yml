@@ -1,5 +1,8 @@
 name: Auto-merge owner pull requests
 # Metadata only: this workflow never checks out or runs pull request code.
+# Only pull requests into the default branch: a pull request stacked on a
+# feature branch would merge at once, because feature branches have no
+# required checks.
 on:
   pull_request_target:
     types: [opened, reopened, ready_for_review]
@@ -12,6 +15,7 @@ jobs:
     name: Enable auto-merge
     if: >-
       !github.event.pull_request.draft &&
+      github.event.pull_request.base.ref == github.event.repository.default_branch &&
       github.event.pull_request.user.login == github.repository_owner &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-26.04

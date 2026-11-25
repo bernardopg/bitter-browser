@@ -20,6 +20,12 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 - AUR publication is its own workflow (`aur.yml`), called by the release and
   runnable by hand for a published release.
+- The *Packages* workflow runs on every pull request that changes more than
+  documentation, the website or the brand book, and its *Packages result*
+  job is a required check, so packaging changes cannot merge before every
+  package is built and installed.
+- Auto-merge is enabled only for pull requests into `main`; stacked pull
+  requests no longer merge into their base branch at once.
 
 ## [0.6.0] - 2026-11-24
 
