@@ -80,17 +80,17 @@ SHA-256 checksum before installing. Or choose a channel:
 | --- | --- |
 | Arch Linux (AUR) | `yay -S bitter-browser` (source) or `yay -S bitter-browser-bin` (prebuilt) |
 | Arch Linux (pacman) | [add the signed repository](docs/distribution.md#arch-linux-pacman-repository), then `sudo pacman -S bitter-browser` |
-| Debian 13, Ubuntu 25.10+, Linux Mint 23 | `sudo apt install ./bitter-browser_0.6.0-1_amd64.deb` |
-| Fedora 43+ | `sudo dnf install ./bitter-browser-0.6.0-1.fc44.x86_64.rpm` |
-| Any distribution with Flatpak | `flatpak install --user ./bitter-browser-0.6.0-x86_64.flatpak` |
-| Other x86-64 Linux (glibc 2.41+) | `bitter-browser-0.6.0-linux-x86_64.tar.xz`, then `./install.sh` |
+| Debian 13, Ubuntu 25.10+, Linux Mint 23 | `sudo apt install ./bitter-browser_0.6.1-1_amd64.deb` |
+| Fedora 43+ | `sudo dnf install ./bitter-browser-0.6.1-1.fc44.x86_64.rpm` |
+| Any distribution with Flatpak | `flatpak install --user ./bitter-browser-0.6.1-x86_64.flatpak` |
+| Other x86-64 Linux (glibc 2.41+) | `bitter-browser-0.6.1-linux-x86_64.tar.xz`, then `./install.sh` |
 
 Packages are on every [release](https://github.com/bernardopg/bitter-browser/releases/latest),
 with a checksum file, an SPDX SBOM and GitHub build provenance attestations:
 
 ```sh
-sha256sum -c --ignore-missing bitter-browser-0.6.0-sha256.txt
-gh attestation verify bitter-browser-0.6.0-x86_64.flatpak --repo bernardopg/bitter-browser
+sha256sum -c --ignore-missing bitter-browser-0.6.1-sha256.txt
+gh attestation verify bitter-browser-0.6.1-x86_64.flatpak --repo bernardopg/bitter-browser
 ```
 
 To make Bitter Browser your default browser, open **Preferences > General >

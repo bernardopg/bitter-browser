@@ -1,5 +1,5 @@
 project('bitter-browser', 'rust',
-  version: '0.6.0',
+  version: '0.6.1',
   meson_version: '>= 0.59.0',
 )
 
