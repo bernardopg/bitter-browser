@@ -9,6 +9,9 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 ### Fixed
 
+- In the Flatpak, Preferences > General > Default browser claimed that Bitter
+  Browser opens web links, because the sandbox only sees the application's
+  own desktop file. It now points to the system settings, as intended.
 - The release check of the portable archive looked for the installed browser
   in `~/.local` when the installer runs as root, where it installs into
   `/usr/local`. The failed check skipped the AUR publication of 0.6.0.
