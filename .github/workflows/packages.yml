@@ -1,21 +1,12 @@
 name: Packages
 # Builds every Linux package from the source archive and tests each one on the
-# distributions it targets. Pull requests that touch packaging run it as a
-# check; the Release workflow calls it for the tag and publishes the result.
+# distributions it targets. It runs on every pull request; the changes job
+# skips the build when only documentation, the website or the brand book
+# changed. "Packages result" is a required check for main. The Release
+# workflow calls it for the tag and publishes the result.
 # See docs/distribution.md.
 on:
   pull_request:
-    paths:
-      - '.github/workflows/packages.yml'
-      - '.github/workflows/release.yml'
-      - 'PKGBUILD'
-      - 'packaging/**'
-      - 'scripts/install.sh'
-      - 'scripts/check-version.py'
-      - 'meson.build'
-      - 'Cargo.lock'
-      - 'crates/bitter-ui/data/**'
-      - 'flatpak/**'
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -43,8 +34,42 @@ concurrency:
 env:
   APP_ID: br.com.bebitterbebetter.browser.Bitter
 jobs:
+  changes:
+    name: Decide whether to build packages
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+    steps:
+      - name: Look at the changed files
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          relevant=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename' |
+            grep -v -E '^(docs/|site/|release-checks/|branding/README\.md$)|\.md$' || true)
+          if [ -n "$relevant" ]; then
+            printf 'Files that affect the packages:\n%s\n' "$relevant"
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Only documentation or website files changed"
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
+
   source:
     name: Source archive and metadata
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
@@ -292,3 +317,26 @@ jobs:
         run: |
           scripts/headless-session.sh --screen 1440x1000x24 -- \
             timeout 180s python3 scripts/daily-smoke.py /usr/bin/bitter-ui
+
+  result:
+    name: Packages result
+    if: always()
+    needs: [changes, source, linux, rpm, arch, flatpak, install, smoke]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Every package job passed, or the build was not needed
+        env:
+          BUILD: ${{ needs.changes.outputs.build }}
+          CHANGES: ${{ needs.changes.result }}
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          if [ "$CHANGES" = success ] && [ "$BUILD" = false ]; then
+            echo "No package build needed"
+            exit 0
+          fi
+          for result in $RESULTS; do
+            [ "$result" = success ] || exit 1
+          done

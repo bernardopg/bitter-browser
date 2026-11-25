@@ -213,7 +213,9 @@ centers treat the new ID as its successor.
 
 ### Pipeline
 
-The *Packages* workflow runs on pull requests that change packaging files and
+The *Packages* workflow runs on every pull request (its first job skips the
+build when only documentation, the website or the brand book changed; the
+final *Packages result* job is a required check for `main`) and
 from the *Release* workflow:
 
 1. **source**: validates the desktop file, the metainfo and every packaging
