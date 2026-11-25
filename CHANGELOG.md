@@ -7,7 +7,17 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.6.1] - 2026-11-25
+## [0.6.2] - 2026-11-25
+
+This release contains the changes listed under 0.6.1. The 0.6.1 tag exists,
+but its release workflow could not start, so 0.6.1 was never published.
+
+### Fixed
+
+- The release workflow granted the package build fewer permissions than its
+  new changes job requests, so GitHub refused to start the 0.6.1 release.
+
+## [0.6.1] - 2026-11-25 (not published)
 
 ### Changed
 
@@ -249,6 +259,7 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 - Meson installation of the executable and the application icon.
 
+[0.6.2]: https://github.com/bernardopg/bitter-browser/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/bernardopg/bitter-browser/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/bernardopg/bitter-browser/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/bernardopg/bitter-browser/compare/v0.4.0...v0.5.0
