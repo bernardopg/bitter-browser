@@ -1,56 +1,90 @@
 name: Release
+# Runs when a signed vX.Y.Z tag is pushed. The jobs run in a chain and each one
+# needs the previous one to succeed:
+#   check -> packages (build and test every format) -> publish (GitHub release)
+#   -> verify (install the published release on each distribution) -> aur
+# Nothing is published before every package is built and tested, and the AUR
+# is updated only after the published release installs everywhere.
+# See docs/distribution.md and docs/ci-release.md.
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
 permissions: {}
 concurrency:
   group: release-${{ github.ref }}
+  # Never stop a release halfway through publishing.
   cancel-in-progress: false
+env:
+  TAG: ${{ github.ref_name }}
+  APP_ID: br.com.bebitterbebetter.browser.Bitter
 jobs:
-  release:
-    name: Build and publish release
+  check:
+    name: Check the tag
     runs-on: ubuntu-26.04
-    timeout-minutes: 90
+    timeout-minutes: 10
     permissions:
-      contents: write
-      id-token: write
-      attestations: write
-    env:
-      TAG: ${{ github.ref_name }}
-      APP_ID: com.bitterbrowser.Browser
-      FLATHUB: https://dl.flathub.org/repo/flathub.flatpakrepo
+      contents: read
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check the tag
+      - name: Tag is on main and every version file agrees
+        id: tag
         run: |
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
           python3 scripts/check-version.py "$TAG"
           python3 scripts/check-flatpak-sources.py
-          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
-      - name: Install Flatpak tooling
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
-          flatpak remote-add --user --if-not-exists flathub "$FLATHUB"
-          flatpak install --user -y --noninteractive flathub \
-            org.gnome.Platform//51 org.gnome.Sdk//51 org.freedesktop.Sdk.Extension.rust-stable//26.08
-      - name: Build Flatpak bundle offline
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+  packages:
+    name: Packages
+    needs: check
+    permissions:
+      contents: read
+    uses: ./.github/workflows/packages.yml
+    with:
+      ref: ${{ github.sha }}
+      sign: true
+    secrets:
+      PACMAN_GPG_PRIVATE_KEY: ${{ secrets.PACMAN_GPG_PRIVATE_KEY }}
+      PACMAN_GPG_FINGERPRINT: ${{ secrets.PACMAN_GPG_FINGERPRINT }}
+
+  publish:
+    name: Publish the GitHub release
+    needs: [check, packages]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: artifacts
+      - name: Collect the release assets
         run: |
           mkdir dist
-          flatpak-builder --user --disable-rofiles-fuse --force-clean --repo=repo build \
-            flatpak/com.bitterbrowser.Browser.json
-          flatpak build-bundle repo "dist/bitter-browser-$VERSION-x86_64.flatpak" "$APP_ID" \
-            --runtime-repo="$FLATHUB"
-      - name: Create source archive and Arch package recipe
-        run: |
-          archive="bitter-browser-$VERSION.tar.gz"
-          git archive --format=tar.gz --prefix="bitter-browser-$VERSION/" -o "dist/$archive" "$GITHUB_SHA"
-          checksum=$(sha256sum "dist/$archive" | cut -d' ' -f1)
-          sed "s/^sha256sums=('SKIP')$/sha256sums=('$checksum')/" packaging/arch/PKGBUILD > dist/PKGBUILD
-          grep -q "sha256sums=('$checksum')" dist/PKGBUILD
+          cp artifacts/source/*.tar.gz dist/
+          cp artifacts/linux/*.deb artifacts/linux/*.tar.xz dist/
+          cp artifacts/rpm/*.rpm dist/
+          cp artifacts/flatpak/*.flatpak dist/
+          # Native Arch package and the signed pacman repository (flat assets).
+          cp artifacts/arch/repo/* dist/
+          cp artifacts/arch/pkg/bitter-browser-bin-*.pkg.tar.zst dist/
+          # The recipe that builds this release from the source archive, as before.
+          cp artifacts/arch/aur/bitter-browser/PKGBUILD dist/PKGBUILD
+          cp scripts/install.sh dist/install.sh
+          cp packaging/arch/bitter-browser-packages.asc dist/
+          ls -la dist
       - name: Generate SBOM
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
@@ -81,6 +115,8 @@ jobs:
           if not match or not match.group(1).strip():
               sys.exit(f"CHANGELOG.md has no notes for {version}")
           print(match.group(1).strip())
+          print()
+          print(open("packaging/release-install-notes.md", encoding="utf-8").read().replace("@VERSION@", version))
           PY
           gh release create "$TAG" dist/* --verify-tag --title "Bitter Browser $VERSION" \
             --notes-file notes.md
@@ -93,9 +129,113 @@ jobs:
           cd published
           gh release download "$TAG"
           sha256sum -c "bitter-browser-$VERSION-sha256.txt"
+          for file in *; do
+            gh attestation verify "$file" --repo "$GH_REPO" >/dev/null
+          done
           # The PKGBUILD must fetch exactly the archive its checksum describes.
           source_url=$(bash -c 'source ./PKGBUILD && printf "%s" "${source[0]}"')
           expected=$(bash -c 'source ./PKGBUILD && printf "%s" "${sha256sums[0]}"')
-          case "$source_url" in *::*) source_url=${source_url#*::} ;; esac
           curl -fsSL "$source_url" -o source.tar.gz
           echo "$expected  source.tar.gz" | sha256sum -c
+
+  verify:
+    name: Install the published release on ${{ matrix.image }} (${{ matrix.method }})
+    needs: [check, publish]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {image: 'debian:trixie', method: deb}
+          - {image: 'ubuntu:26.04', method: deb}
+          - {image: 'fedora:44', method: rpm}
+          - {image: 'archlinux:latest', method: pacman}
+          - {image: 'archlinux:latest', method: pacman-repo}
+          - {image: 'opensuse/tumbleweed', method: tarball}
+    container:
+      image: ${{ matrix.image }}
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      METHOD: ${{ matrix.method }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install with the published installer or repository
+        run: sh packaging/linux/verify-published.sh "$METHOD" "$VERSION"
+
+  aur:
+    name: Publish to the AUR
+    needs: [check, packages, verify]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arch
+          path: arch
+      - name: Recipes point at the published assets
+        run: |
+          for pkg in bitter-browser bitter-browser-bin; do
+            grep -q "^pkgver=$VERSION$" "arch/aur/$pkg/PKGBUILD"
+            grep -q "sha256sums.*=('[0-9a-f]\{64\}')" "arch/aur/$pkg/PKGBUILD"
+          done
+      # The AUR has short maintenance windows that reject SSH pushes.
+      - name: Wait for the AUR
+        run: |
+          for attempt in $(seq 1 20); do
+            if git ls-remote https://aur.archlinux.org/bitter-browser.git >/dev/null 2>&1; then
+              echo "AUR reachable (attempt $attempt)"
+              exit 0
+            fi
+            echo "AUR unreachable (attempt $attempt/20); retrying in 30 s"
+            sleep 30
+          done
+          exit 1
+      # Each step publishes: it validates the PKGBUILD, regenerates .SRCINFO and
+      # pushes to the AUR. The first push creates the package.
+      - name: Publish bitter-browser
+        uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v4.2.0
+        with:
+          pkgname: bitter-browser
+          pkgbuild: arch/aur/bitter-browser/PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update to ${{ env.VERSION }}
+          ssh_keyscan_types: rsa,ecdsa,ed25519
+      - name: Publish bitter-browser-bin
+        uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v4.2.0
+        with:
+          pkgname: bitter-browser-bin
+          pkgbuild: arch/aur/bitter-browser-bin/PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update to ${{ env.VERSION }}
+          ssh_keyscan_types: rsa,ecdsa,ed25519
+      - name: Publish bitter-browser-git
+        uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v4.2.0
+        with:
+          pkgname: bitter-browser-git
+          pkgbuild: arch/aur/bitter-browser-git/PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Sync the recipe with ${{ env.VERSION }}
+          ssh_keyscan_types: rsa,ecdsa,ed25519
+      - name: Check the AUR packages
+        run: |
+          for pkg in bitter-browser bitter-browser-bin; do
+            version=$(curl -fsSL "https://aur.archlinux.org/rpc/v5/info?arg[]=$pkg" |
+              python3 -c 'import json,sys; r=json.load(sys.stdin)["results"]; print(r[0]["Version"] if r else "")')
+            echo "$pkg: $version"
+            test "$version" = "$VERSION-1"
+          done

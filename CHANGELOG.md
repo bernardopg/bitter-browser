@@ -7,6 +7,35 @@ All notable changes to Bitter Browser are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Native packages for every release: `.deb` for Debian 13, Ubuntu 25.10+ and
+  Linux Mint 23; `.rpm` for Fedora 43+; a portable `.tar.xz` with its own
+  `install.sh`; and the Arch packages `bitter-browser`, `bitter-browser-bin`
+  and `bitter-browser-git` on the AUR.
+- A signed pacman repository served from the latest GitHub release.
+- A one-line installer (`curl -fsSL https://browser.bebitterbebetter.com.br/install.sh | sh`)
+  that picks the native package and checks its SHA-256 checksum before
+  installing.
+- Preferences > General > Default browser makes Bitter Browser the default
+  browser for web links and HTML files.
+- Better desktop integration: PNG icons in every common size, an Xfce
+  preferred-applications helper, the Debian `x-www-browser` alternative,
+  `StartupWMClass`, keywords and software-center metadata.
+
+### Changed
+
+- The application ID is now `br.com.bebitterbebetter.browser.Bitter`
+  (was `com.bitterbrowser.Browser`, whose domain belongs to another product).
+  Native profiles are unchanged; Flatpak users copy their data once, as
+  described in `docs/distribution.md`.
+- The release workflow builds every package from the source archive, installs
+  each one on Debian, Ubuntu, Linux Mint, Fedora, Arch and openSUSE, publishes
+  the release, installs the published release again, and only then updates
+  the AUR.
+- The Arch recipes' `check()` runs the tests that need no display, so they
+  build in clean chroots.
+
 ## [0.5.0] - 2026-11-23
 
 ### Added

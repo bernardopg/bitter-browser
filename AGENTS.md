@@ -193,6 +193,34 @@ it. Never keep merged branches around.
 - Branches of closed, unmerged pull requests are not deleted automatically.
   Check them with `git cherry` and ask the owner before deleting them.
 
+## Packaging and distribution
+
+The full guide is [docs/distribution.md](docs/distribution.md).
+
+- The application ID is `br.com.bebitterbebetter.browser.Bitter` (domain
+  `browser.bebitterbebetter.com.br`, a subdomain of the owner's site). Use it
+  for the desktop file, metainfo, GSettings schema, icons and Flatpak
+  manifest. `com.bitterbrowser.Browser` is the old ID: `bitterbrowser.com`
+  belongs to another product, so never reuse it.
+- Packaging lives in `packaging/` (`linux/`, `debian/`, `rpm/`, `arch/`,
+  `arch-bin/`) and the root `PKGBUILD` (`-git`). The *Packages* workflow
+  builds and installs every format on pull requests that touch packaging;
+  run the same scripts locally in Docker containers (examples in the guide).
+- A version bump also changes `packaging/arch-bin/PKGBUILD` and
+  `packaging/rpm/bitter-browser.spec`; `scripts/check-version.py` checks them.
+- After changing the application icon SVG, run `scripts/render-icons.sh` and
+  commit the PNG files.
+- Release secrets (AUR account and SSH key, pacman signing key) are GitHub
+  Actions secrets. The owner keeps the values in `.env` (ignored by git;
+  `.env.example` lists the names). Never commit `.env`, print its values or
+  copy them into logs, issues or memories.
+- Flathub forbids AI-written Flathub manifests and AI-opened or automated
+  submission pull requests. Agents prepare the upstream metadata only; the
+  owner writes and submits the Flathub manifest.
+- No AppImage: WebKitGTK 6.0 confines its helper processes with bubblewrap
+  at a compiled-in path, and the project does not ship a browser with that
+  sandbox turned off. The reasons are in the guide.
+
 ## Releases
 
 Follow [docs/ci-release.md](docs/ci-release.md#releases):

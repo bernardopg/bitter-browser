@@ -69,37 +69,36 @@ workspaces, and the interface follows the GNOME design language.
 
 ## Install
 
-Every [release](https://github.com/bernardopg/bitter-browser/releases/latest)
-ships a Flatpak bundle, a source archive, an Arch `PKGBUILD`, an SPDX SBOM and
-a checksum file. All assets carry GitHub build provenance attestations.
-
-### Flatpak
-
 ```sh
-flatpak install --user flathub org.gnome.Platform//51
-flatpak install --user ./bitter-browser-0.5.0-x86_64.flatpak
-flatpak run com.bitterbrowser.Browser
+curl -fsSL https://browser.bebitterbebetter.com.br/install.sh | sh
 ```
 
-### Arch Linux
+The installer picks the native package for your distribution and checks its
+SHA-256 checksum before installing. Or choose a channel:
 
-Build the release package from the `PKGBUILD` attached to the release:
+| System | Command |
+| --- | --- |
+| Arch Linux (AUR) | `yay -S bitter-browser` (source) or `yay -S bitter-browser-bin` (prebuilt) |
+| Arch Linux (pacman) | [add the signed repository](docs/distribution.md#arch-linux-pacman-repository), then `sudo pacman -S bitter-browser` |
+| Debian 13, Ubuntu 25.10+, Linux Mint 23 | `sudo apt install ./bitter-browser_0.5.0-1_amd64.deb` |
+| Fedora 43+ | `sudo dnf install ./bitter-browser-0.5.0-1.fc44.x86_64.rpm` |
+| Any distribution with Flatpak | `flatpak install --user ./bitter-browser-0.5.0-x86_64.flatpak` |
+| Other x86-64 Linux (glibc 2.41+) | `bitter-browser-0.5.0-linux-x86_64.tar.xz`, then `./install.sh` |
 
-```sh
-mkdir bitter-browser && cd bitter-browser
-curl -LO https://github.com/bernardopg/bitter-browser/releases/latest/download/PKGBUILD
-makepkg -si
-```
-
-For the latest commit, run `makepkg -si` with the `PKGBUILD` at the
-repository root, which builds `bitter-browser-git`.
-
-### Verify a download
+Packages are on every [release](https://github.com/bernardopg/bitter-browser/releases/latest),
+with a checksum file, an SPDX SBOM and GitHub build provenance attestations:
 
 ```sh
 sha256sum -c --ignore-missing bitter-browser-0.5.0-sha256.txt
 gh attestation verify bitter-browser-0.5.0-x86_64.flatpak --repo bernardopg/bitter-browser
 ```
+
+To make Bitter Browser your default browser, open **Preferences > General >
+Default browser** or run
+`xdg-settings set default-web-browser br.com.bebitterbebetter.browser.Bitter.desktop`.
+[Distribution and desktop integration](docs/distribution.md) covers each
+distribution and desktop (GNOME, KDE Plasma, Xfce, Cinnamon, MATE), upgrades
+from the old `com.bitterbrowser.Browser` ID and uninstalling.
 
 ## Keyboard shortcuts
 
@@ -153,6 +152,7 @@ under Xvfb; see [daily browsing](docs/daily-browsing.md#verification).
 | [Architecture](docs/architecture.md) | Crate layout and current scope |
 | [Component inventory](docs/components.md) | Ownership, runtime dependencies, local state and entry points |
 | [Release and support contract](docs/support.md) | Target platforms, runtime policy, defaults and production criteria |
+| [Distribution and desktop integration](docs/distribution.md) | Install channels, supported distributions and desktops, default browser, packaging pipeline and secrets |
 | [CI and releases](docs/ci-release.md) | Checks, coverage, branch cleanup and the release process |
 | [Agent instructions](AGENTS.md) | Checks, tokensave, Headroom memory, branch cleanup and release check records |
 | [Roadmap](TASKS.md) | Production readiness plan |

@@ -1,0 +1,7 @@
+# rpmlint settings for the Bitter Browser RPM.
+Filters = [
+    # Library and project names (libadwaita, WebKitGTK) are not in the dictionary.
+    "spelling-error",
+    # The browser has no manual pages yet; --help documents both commands.
+    "no-manual-page-for-binary",
+]

@@ -26,6 +26,8 @@ Details: [Profiles and local data](docs/profile.md),
 
 ### Recommended next work
 
+0. DIST-01 to DIST-08 and BRAND-01: distribution on the main Linux
+   distributions and the brand come first (owner decision, 2026-11-24).
 1. PRD-01 and PRD-02: without a product contract and threat model, none of
    the P0 gates can be signed off.
 2. TEST-03 with SEC-04 and SEC-05: a disposable local CA, invalid
@@ -38,6 +40,30 @@ Details: [Profiles and local data](docs/profile.md),
    pages, and externalized strings.
 5. UI-07: a compatibility matrix with sign-in pop-ups, video calls and media
    sites, now that the platform features exist.
+
+## P0 — Linux distribution (priority)
+
+Decided on 2026-11-24 as the top priority. Details and status:
+[Distribution and desktop integration](docs/distribution.md).
+
+- [ ] **DIST-01 — Native packages and AUR.** `.deb`, `.rpm`, portable `.tar.xz` with installer, AUR `bitter-browser`, `bitter-browser-bin` and `bitter-browser-git`, built from the source archive and installed on Debian, Ubuntu, Mint, Fedora, Arch and openSUSE in CI. Depends: OPS-02.
+  *Status:* Implemented in the *Packages* and *Release* workflows. Done when a release publishes every package and the AUR job succeeds.
+- [ ] **DIST-02 — Signed pacman repository.** Serve `[bitter-browser]` from the latest release, signed with the *Bitter Browser Packages* key; verify the documented setup in CI after each release. Depends: DIST-01.
+  *Status:* Implemented; done after the first release that publishes it passes the *verify* job.
+- [ ] **DIST-03 — One-line installer.** `curl -fsSL https://browser.bebitterbebetter.com.br/install.sh | sh` with checksum verification, per-distribution method, uninstall and dry run. Depends: DIST-01, DIST-08.
+  *Status:* `scripts/install.sh` is published with each release and tested after publishing. The site redirect is DIST-08.
+- [ ] **DIST-04 — Desktop integration and default browser.** Desktop file, icons in every size, metainfo, Xfce helper, Debian alternatives, and a Preferences action that makes the browser the default on GNOME, KDE Plasma, Xfce, Cinnamon and MATE. Depends: none.
+  *Status:* Implemented. Missing: a manual check on each of the five desktops, recorded in the release check record.
+- [ ] **DIST-05 — Flathub.** The owner writes the Flathub manifest by hand and submits it (Flathub forbids AI-written manifests and AI-opened submissions), then verifies the app ID with the token on `browser.bebitterbebetter.com.br`. Depends: DIST-04.
+  *Status:* Upstream metadata, app ID and domain are ready.
+- [ ] **DIST-06 — APT, DNF and openSUSE repositories.** Automatic updates for `.deb` and `.rpm` users through COPR, the openSUSE Build Service or signed repositories on the project site. Depends: DIST-01.
+  *Status:* Not started.
+- [ ] **DIST-07 — AppImage and aarch64.** An AppImage that keeps WebKit's bubblewrap sandbox (private mount namespace for the helper path, AppArmor on Ubuntu 24.04+), and arm64 builds of every format on GitHub's arm64 runners. Depends: DIST-01.
+  *Status:* Not started; the AppImage blocker is documented in the distribution guide.
+- [ ] **DIST-08 — Project website.** `browser.bebitterbebetter.com.br` with the brand, downloads, `install.sh` redirect and the Flathub verification file; keep the owner's main site deploy from deleting it. Depends: BRAND-01.
+  *Status:* Subdomain created on 2026-11-24.
+- [ ] **BRAND-01 — Visual identity.** Logo, icon set, typography, palette, slogan and media kit applied to the app icon, metainfo branding colors, README and website. Depends: none.
+  *Status:* Not started.
 
 ## P0 — Define the product and release gates
 

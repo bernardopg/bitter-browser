@@ -1,0 +1,294 @@
+name: Packages
+# Builds every Linux package from the source archive and tests each one on the
+# distributions it targets. Pull requests that touch packaging run it as a
+# check; the Release workflow calls it for the tag and publishes the result.
+# See docs/distribution.md.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/packages.yml'
+      - '.github/workflows/release.yml'
+      - 'PKGBUILD'
+      - 'packaging/**'
+      - 'scripts/install.sh'
+      - 'scripts/check-version.py'
+      - 'meson.build'
+      - 'Cargo.lock'
+      - 'crates/bitter-ui/data/**'
+      - 'flatpak/**'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to package
+        required: true
+        type: string
+      sign:
+        description: Sign the pacman repository (needs the signing secrets)
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      PACMAN_GPG_PRIVATE_KEY:
+        required: false
+      PACMAN_GPG_FINGERPRINT:
+        required: false
+    outputs:
+      version:
+        value: ${{ jobs.source.outputs.version }}
+permissions: {}
+concurrency:
+  group: packages-${{ inputs.ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  APP_ID: br.com.bebitterbebetter.browser.Bitter
+jobs:
+  source:
+    name: Source archive and metadata
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      epoch: ${{ steps.version.outputs.epoch }}
+      commit: ${{ steps.version.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - name: Read the version
+        id: version
+        run: |
+          version=$(python3 scripts/check-version.py | tail -n 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')
+          {
+            echo "version=$version"
+            echo "epoch=$(git log -1 --format=%ct)"
+            echo "commit=$(git rev-parse --short=7 HEAD)"
+          } >> "$GITHUB_OUTPUT"
+      - name: Validate desktop integration metadata
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y desktop-file-utils appstream shellcheck
+          desktop-file-validate "crates/bitter-ui/data/$APP_ID.desktop"
+          appstreamcli validate --no-net "crates/bitter-ui/data/$APP_ID.metainfo.xml"
+          shellcheck -s sh scripts/install.sh scripts/render-icons.sh packaging/*/*.sh \
+            packaging/debian/postinst packaging/debian/prerm
+      - name: Create the source archive
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir dist
+          git archive --format=tar.gz --prefix="bitter-browser-$VERSION/" \
+            -o "dist/bitter-browser-$VERSION.tar.gz" HEAD
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: source
+          path: dist/
+          if-no-files-found: error
+
+  linux:
+    name: Portable build and .deb (Debian 13)
+    needs: source
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    container:
+      image: debian:trixie
+    env:
+      VERSION: ${{ needs.source.outputs.version }}
+      SOURCE_DATE_EPOCH: ${{ needs.source.outputs.epoch }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: source
+      - name: Unpack the source archive
+        run: tar -xzf "bitter-browser-$VERSION.tar.gz"
+      - name: Install build dependencies
+        run: sh "bitter-browser-$VERSION/packaging/linux/install-build-deps.sh"
+      - name: Build and stage
+        run: |
+          . "$HOME/.cargo/env"
+          cd "bitter-browser-$VERSION"
+          sh packaging/linux/build-stage.sh "$GITHUB_WORKSPACE/stage"
+      - name: Make the .deb and the portable archive
+        run: |
+          cd "bitter-browser-$VERSION"
+          sh packaging/debian/build-deb.sh "$VERSION" "$GITHUB_WORKSPACE/stage" "$GITHUB_WORKSPACE/out"
+          sh packaging/linux/build-tarball.sh "$VERSION" "$GITHUB_WORKSPACE/stage" "$GITHUB_WORKSPACE/out"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux
+          path: out/
+          if-no-files-found: error
+
+  rpm:
+    name: RPM (Fedora 44)
+    needs: source
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    container:
+      image: fedora:44
+    env:
+      VERSION: ${{ needs.source.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: source
+      - name: Build the RPM from the source archive
+        run: |
+          tar -xzf "bitter-browser-$VERSION.tar.gz"
+          sh "bitter-browser-$VERSION/packaging/rpm/build-rpm.sh" \
+            "$PWD/bitter-browser-$VERSION.tar.gz" "$PWD/out"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rpm
+          path: out/
+          if-no-files-found: error
+
+  arch:
+    name: Arch packages, AUR recipes and pacman repository
+    needs: [source, linux]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    container:
+      image: archlinux:base-devel
+    env:
+      VERSION: ${{ needs.source.outputs.version }}
+      GIT_COMMIT: ${{ needs.source.outputs.commit }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: source
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux
+          path: linux
+      - name: Build, check and install the packages
+        run: |
+          tar -xzf "bitter-browser-$VERSION.tar.gz"
+          sh "bitter-browser-$VERSION/packaging/arch/build-arch.sh" "$VERSION" \
+            "bitter-browser-$VERSION.tar.gz" \
+            "linux/bitter-browser-$VERSION-linux-x86_64.tar.xz" out
+      - name: Sign the pacman repository
+        if: inputs.sign
+        env:
+          PACMAN_GPG_PRIVATE_KEY: ${{ secrets.PACMAN_GPG_PRIVATE_KEY }}
+          PACMAN_GPG_FINGERPRINT: ${{ secrets.PACMAN_GPG_FINGERPRINT }}
+        run: sh "bitter-browser-$VERSION/packaging/arch/make-repo.sh" out/pkg out/repo
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: arch
+          path: out/
+          include-hidden-files: true
+          if-no-files-found: error
+
+  flatpak:
+    name: Flatpak bundle
+    needs: source
+    runs-on: ubuntu-26.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.source.outputs.version }}
+      FLATHUB: https://dl.flathub.org/repo/flathub.flatpakrepo
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub "$FLATHUB"
+          flatpak install --user -y --noninteractive flathub \
+            org.gnome.Platform//51 org.gnome.Sdk//51 org.freedesktop.Sdk.Extension.rust-stable//26.08
+      - name: Build the bundle offline
+        run: |
+          python3 scripts/check-flatpak-sources.py
+          mkdir out
+          flatpak-builder --user --disable-rofiles-fuse --force-clean --repo=repo build \
+            "flatpak/$APP_ID.json"
+          flatpak build-bundle repo "out/bitter-browser-$VERSION-x86_64.flatpak" "$APP_ID" \
+            --runtime-repo="$FLATHUB"
+      - name: Install and start the bundle
+        run: |
+          flatpak install --user -y --noninteractive "out/bitter-browser-$VERSION-x86_64.flatpak"
+          flatpak run "$APP_ID" --version | grep -Fx "Bitter Browser $VERSION"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: flatpak
+          path: out/
+          if-no-files-found: error
+
+  install:
+    name: Install on ${{ matrix.image }} (${{ matrix.format }})
+    needs: [source, linux, rpm, arch]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {image: 'debian:trixie', format: deb}
+          - {image: 'ubuntu:26.04', format: deb}
+          - {image: 'linuxmintd/mint23-amd64', format: deb}
+          - {image: 'fedora:44', format: rpm}
+          - {image: 'fedora:rawhide', format: rpm}
+          - {image: 'archlinux:latest', format: pacman}
+          - {image: 'opensuse/tumbleweed', format: tarball}
+    container:
+      image: ${{ matrix.image }}
+    env:
+      VERSION: ${{ needs.source.outputs.version }}
+      FORMAT: ${{ matrix.format }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: '{linux,rpm,arch}'
+          path: pkgs
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: source
+      - name: Install the package
+        run: |
+          tar -xzf "bitter-browser-$VERSION.tar.gz"
+          sh "bitter-browser-$VERSION/packaging/linux/test-install.sh" "$FORMAT" "$VERSION" "$PWD/pkgs"
+
+  smoke:
+    name: Smoke test the installed .deb (Ubuntu 26.04)
+    needs: [source, linux]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.source.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux
+          path: pkgs
+      - name: Install the package and the test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dbus xvfb xauth xdotool openssl "./pkgs/bitter-browser_${VERSION}-1_amd64.deb"
+      - name: Drive the installed browser
+        run: |
+          scripts/headless-session.sh --screen 1440x1000x24 -- \
+            timeout 180s python3 scripts/daily-smoke.py /usr/bin/bitter-ui
