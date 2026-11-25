@@ -53,16 +53,28 @@
   </supports>
   <screenshots>
     <screenshot type="default">
-      <caption>History in the dark color scheme</caption>
-      <image>https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/history-dark.png</image>
+      <caption>Reading with tabs in a sidebar, dark color scheme</caption>
+      <image type="source" width="1600" height="1000">https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/screenshots/reading-dark.png</image>
     </screenshot>
     <screenshot>
-      <caption>Bookmarks in the light color scheme</caption>
-      <image>https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/bookmarks-light.png</image>
+      <caption>The command palette</caption>
+      <image type="source" width="1600" height="1000">https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/screenshots/palette-dark.png</image>
     </screenshot>
     <screenshot>
-      <caption>Preferences</caption>
-      <image>https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/preferences-dark.png</image>
+      <caption>Ad and tracker blocking and privacy settings</caption>
+      <image type="source" width="1600" height="1000">https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/screenshots/privacy-light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Two workspaces, light color scheme</caption>
+      <image type="source" width="1600" height="1000">https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/screenshots/workspaces-light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The New Tab page with frequently visited sites</caption>
+      <image type="source" width="1600" height="1000">https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/screenshots/newtab-light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Local history with instant filtering</caption>
+      <image type="source" width="1600" height="1000">https://raw.githubusercontent.com/bernardopg/bitter-browser/main/docs/assets/screenshots/history-dark.png</image>
     </screenshot>
   </screenshots>
   <url type="homepage">https://browser.bebitterbebetter.com.br/</url>

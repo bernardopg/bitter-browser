@@ -215,6 +215,10 @@ The full guide is [docs/distribution.md](docs/distribution.md).
   outputs, never edit exported files. `branding/README.md` is the brand book.
   For a one-off icon change outside the brand build, `scripts/render-icons.sh`
   renders the PNG sizes from the SVG.
+- Product screenshots come from the real browser: `branding/screenshots/capture.py`
+  (in the headless session) and `branding/screenshots/compose.py`; see
+  `branding/README.md#product-screenshots`. Regenerate them after visible UI
+  changes.
 - The website lives in `site/`; `scripts/build-site.sh` assembles it with the
   brand assets, the media kit zip and the brand book PDF, and the *Website*
   workflow publishes it on pushes to `main`

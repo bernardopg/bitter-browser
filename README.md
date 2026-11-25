@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/history-dark.png" alt="Bitter Browser showing the History page with tabs in the sidebar, dark color scheme" width="90%">
+  <img src="site/assets/screens/hero-1600.webp" alt="Bitter Browser in the dark color scheme reading an essay with tabs in the sidebar, and a second window showing the New Tab page" width="100%">
 </p>
 
 Bitter Browser is a web browser for the Linux desktop, built with Rust, GTK 4,
@@ -58,12 +58,12 @@ workspaces, and the interface follows the GNOME design language.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/assets/bookmarks-light.png" alt="Bookmarks page in the light color scheme with the Second workspace selected"></td>
-    <td width="50%"><img src="docs/assets/preferences-dark.png" alt="Preferences dialog with search, startup and appearance settings"></td>
+    <td width="50%"><img src="site/assets/screens/palette-1600.webp" alt="The command palette filtering tab commands over a documentation page, dark color scheme"></td>
+    <td width="50%"><img src="site/assets/screens/privacy-1600.webp" alt="The Privacy page of Preferences with ad and tracker blocking turned on, light color scheme"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Bookmarks · light color scheme</sub></td>
-    <td align="center"><sub>Native preferences</sub></td>
+    <td align="center"><sub>Command palette · Ctrl+K</sub></td>
+    <td align="center"><sub>Privacy on by default</sub></td>
   </tr>
 </table>
 
