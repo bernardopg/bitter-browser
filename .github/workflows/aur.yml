@@ -117,11 +117,17 @@ jobs:
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_message: Sync the recipe with ${{ env.VERSION }}
           ssh_keyscan_types: rsa,ecdsa,ed25519
+      # The RPC info endpoint is cached for a while after a new package
+      # appears, so read the published .SRCINFO, which is authoritative.
       - name: Check the AUR packages
         run: |
           for pkg in bitter-browser bitter-browser-bin; do
-            version=$(curl -fsSL "https://aur.archlinux.org/rpc/v5/info?arg[]=$pkg" |
-              python3 -c 'import json,sys; r=json.load(sys.stdin)["results"]; print(r[0]["Version"] if r else "")')
-            echo "$pkg: $version"
-            test "$version" = "$VERSION-1"
+            for _ in 1 2 3 4 5 6; do
+              published=$(curl -fsSL "https://aur.archlinux.org/cgit/aur.git/plain/.SRCINFO?h=$pkg" |
+                sed -n 's/^\tpkgver = //p' | head -n 1)
+              [ "$published" = "$VERSION" ] && break
+              sleep 20
+            done
+            echo "$pkg: $published"
+            test "$published" = "$VERSION"
           done
