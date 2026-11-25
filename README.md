@@ -152,6 +152,7 @@ under Xvfb; see [daily browsing](docs/daily-browsing.md#verification).
 | [Architecture](docs/architecture.md) | Crate layout and current scope |
 | [Component inventory](docs/components.md) | Ownership, runtime dependencies, local state and entry points |
 | [Release and support contract](docs/support.md) | Target platforms, runtime policy, defaults and production criteria |
+| [Brand book](branding/README.md) | Logo, app icon, colors, typography, slogan, campaign assets and press kit |
 | [Distribution and desktop integration](docs/distribution.md) | Install channels, supported distributions and desktops, default browser, packaging pipeline and secrets |
 | [CI and releases](docs/ci-release.md) | Checks, coverage, branch cleanup and the release process |
 | [Agent instructions](AGENTS.md) | Checks, tokensave, Headroom memory, branch cleanup and release check records |

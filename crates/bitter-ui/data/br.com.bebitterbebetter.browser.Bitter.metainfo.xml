@@ -71,8 +71,8 @@
   <url type="donation">https://github.com/sponsors/bernardopg</url>
   <url type="contribute">https://github.com/bernardopg/bitter-browser/blob/main/CONTRIBUTING.md</url>
   <branding>
-    <color type="primary" scheme_preference="light">#f3ecdf</color>
-    <color type="primary" scheme_preference="dark">#2a1d17</color>
+    <color type="primary" scheme_preference="light">#f6efe3</color>
+    <color type="primary" scheme_preference="dark">#3a2419</color>
   </branding>
   <content_rating type="oars-1.1"/>
   <categories>

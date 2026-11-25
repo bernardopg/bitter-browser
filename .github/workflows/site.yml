@@ -1,0 +1,64 @@
+name: Website
+# Builds browser.bebitterbebetter.com.br from site/ and branding/. Pull
+# requests only build it; pushes to main publish it to the Hostinger
+# subdomain over SSH and check the live site.
+on:
+  pull_request:
+    paths: ['site/**', 'branding/**', 'docs/assets/**', 'scripts/build-site.sh', 'scripts/deploy-site.sh', '.github/workflows/site.yml']
+  push:
+    branches: [main]
+    paths: ['site/**', 'branding/**', 'docs/assets/**', 'scripts/build-site.sh', 'scripts/deploy-site.sh', '.github/workflows/site.yml']
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  site:
+    name: Build and publish the website
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build
+        run: |
+          shellcheck -s sh scripts/build-site.sh scripts/deploy-site.sh
+          scripts/build-site.sh "$RUNNER_TEMP/site"
+          test -s "$RUNNER_TEMP/site/brand/bitter-browser-brand-book.pdf"
+          test -s "$RUNNER_TEMP/site/brand/bitter-browser-media-kit.zip"
+          # The site promises no third-party requests: no external src or href in pages and styles.
+          if grep -rEn '(src|@import|url\()[=(]?["'\'']?https?://' "$RUNNER_TEMP/site" --include='*.html' --include='*.css'; then
+            echo "A page loads a third-party resource" >&2
+            exit 1
+          fi
+      - name: Publish
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          SITE_SSH_HOST: ${{ vars.SITE_SSH_HOST }}
+          SITE_SSH_PORT: ${{ vars.SITE_SSH_PORT }}
+          SITE_SSH_USER: ${{ vars.SITE_SSH_USER }}
+          SITE_REMOTE_DIR: ${{ vars.SITE_REMOTE_DIR }}
+          SITE_SSH_PRIVATE_KEY: ${{ secrets.SITE_SSH_PRIVATE_KEY }}
+          SITE_SSH_KNOWN_HOSTS_LINE: ${{ secrets.SITE_SSH_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          printf '%s\n' "$SITE_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/site_key"
+          printf '%s\n' "$SITE_SSH_KNOWN_HOSTS_LINE" > "$RUNNER_TEMP/known_hosts"
+          SITE_SSH_KEY_PATH="$RUNNER_TEMP/site_key" SITE_SSH_KNOWN_HOSTS="$RUNNER_TEMP/known_hosts" \
+            scripts/deploy-site.sh
+          rm -f "$RUNNER_TEMP/site_key"
+      - name: Check the live site
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          for _ in 1 2 3 4 5; do
+            curl -fsS https://browser.bebitterbebetter.com.br/ | grep -q 'The web, <em>unsweetened.</em>' && break
+            sleep 10
+          done
+          curl -fsS https://browser.bebitterbebetter.com.br/ | grep -q 'The web, <em>unsweetened.</em>'
+          curl -fsS -o /dev/null https://browser.bebitterbebetter.com.br/brand/bitter-browser-brand-book.pdf
+          location=$(curl -fsS -o /dev/null -w '%{redirect_url}' https://browser.bebitterbebetter.com.br/install.sh)
+          test "$location" = "https://github.com/bernardopg/bitter-browser/releases/latest/download/install.sh"

@@ -19,6 +19,13 @@ All notable changes to Bitter Browser are documented here. The format follows
   installing.
 - Preferences > General > Default browser makes Bitter Browser the default
   browser for web links and HTML files.
+- A visual identity: the drop-of-bitters mark, the Fraunces wordmark, a
+  new application icon and symbolic icon, the espresso and bitter-orange
+  palette, and the slogan "The web, unsweetened." `branding/build.py`
+  generates every asset; `branding/README.md` is the brand book.
+- The website https://browser.bebitterbebetter.com.br/ with install
+  commands and the media kit, published by the *Website* workflow. It loads
+  nothing from third parties.
 - Better desktop integration: PNG icons in every common size, an Xfce
   preferred-applications helper, the Debian `x-www-browser` alternative,
   `StartupWMClass`, keywords and software-center metadata.

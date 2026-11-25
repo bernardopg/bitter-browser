@@ -1,0 +1,14 @@
+:root {
+  --bitter-espresso: #1C110D;
+  --bitter-roast: #3A2419;
+  --bitter-cacao: #5A3426;
+  --bitter-bitter-orange: #E8793A;
+  --bitter-amber: #F4A259;
+  --bitter-zest: #D9622B;
+  --bitter-cream: #F6EFE3;
+  --bitter-paper: #FBF6EE;
+  --bitter-gentian: #2F5D50;
+  --bitter-font-display: 'Fraunces', Georgia, serif;
+  --bitter-font-text: 'Inter', system-ui, sans-serif;
+  --bitter-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}

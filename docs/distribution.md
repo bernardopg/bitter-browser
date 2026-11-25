@@ -266,6 +266,10 @@ root, which git ignores; `.env.example` lists the names.
 | `AUR_SSH_PRIVATE_KEY` | Private SSH key registered on the AUR account | AUR job |
 | `PACMAN_GPG_PRIVATE_KEY` | Armored secret key of *Bitter Browser Packages* | arch job (`make-repo.sh`) |
 | `PACMAN_GPG_FINGERPRINT` | `A22AFBDCDAA14B6958228038CAEA87029C2D9818` | arch job |
+| `SITE_SSH_PRIVATE_KEY`, `SITE_SSH_KNOWN_HOSTS` | Hostinger SSH key and the server's host keys | *Website* workflow |
+
+The *Website* workflow also reads the repository variables `SITE_SSH_HOST`,
+`SITE_SSH_PORT`, `SITE_SSH_USER` and `SITE_REMOTE_DIR`.
 
 The signing key expires on 2029-11-23. To rotate it, generate a new ed25519
 signing key, replace `packaging/arch/bitter-browser-packages.asc`, update both
